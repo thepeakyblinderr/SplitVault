@@ -384,6 +384,7 @@ body{
 <div id="v-personal"  class="view"></div>
 <div id="v-groups"    class="view"></div>
 <div id="v-analytics" class="view"></div>
+<div id="v-maintain"  class="view"></div>
 
 <!-- ── BOTTOM TAB BAR ── -->
 <nav class="tabbar">
@@ -393,11 +394,15 @@ body{
   </button>
   <button class="ti" id="ti-personal" onclick="showView('personal')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-    Personal<div class="tidot"></div>
+    Expenses<div class="tidot"></div>
   </button>
   <button class="ti" id="ti-groups" onclick="showView('groups')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
     Groups<div class="tidot"></div>
+  </button>
+  <button class="ti" id="ti-maintain" onclick="showView('maintain')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+    Maintain<div class="tidot"></div>
   </button>
   <button class="ti" id="ti-analytics" onclick="showView('analytics')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -679,6 +684,89 @@ body{
 </div>
 </div>
 
+<!-- ADD / EDIT MAINTENANCE ITEM -->
+<div class="ovr" id="m-maint">
+<div class="modal">
+  <div class="mhd"><div class="mtl" id="maint-ttl">Add Item</div><button class="mclose" onclick="closeMod('m-maint')">×</button></div>
+  <div class="mbd">
+    <div class="fmg">
+      <div class="fg"><label class="fl">Icon</label><div class="catg" id="maint-icons"></div></div>
+      <div class="fg"><label class="fl">Item Name</label>
+        <input type="text" class="fi" id="maint-name" placeholder="e.g. Car Oil Change, AC Service…" maxlength="60" autocomplete="off">
+      </div>
+      <div class="fg"><label class="fl">Asset / Vehicle</label>
+        <input type="text" class="fi" id="maint-asset" placeholder="e.g. Swift, Home AC, Bike…" maxlength="40" autocomplete="off">
+      </div>
+      <div class="fg2">
+        <div class="fg"><label class="fl">Last Done</label>
+          <input type="date" class="fi" id="maint-last">
+        </div>
+        <div class="fg"><label class="fl">Cost Last Time</label>
+          <div class="fiw"><div class="fip" id="maint-pfx">₹</div><input type="number" class="fi" id="maint-cost" placeholder="0" min="0" step="1"></div>
+        </div>
+      </div>
+      <div class="fg"><label class="fl">Remind me every</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="fiw"><input type="number" class="fi" id="maint-interval" placeholder="e.g. 3" min="1" max="999" style="border-radius:var(--r);"></div>
+          <select class="fs" id="maint-unit">
+            <option value="days">Days</option>
+            <option value="weeks">Weeks</option>
+            <option value="months" selected>Months</option>
+            <option value="years">Years</option>
+            <option value="km">Kilometres</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg" id="maint-km-wrap" style="display:none">
+        <label class="fl">Current Odometer (km)</label>
+        <input type="number" class="fi" id="maint-km" placeholder="e.g. 45000" min="0" step="1">
+      </div>
+      <div class="fg"><label class="fl">Notes (optional)</label>
+        <textarea class="fta" id="maint-notes" rows="2" placeholder="Service centre, warranty info…"></textarea>
+      </div>
+    </div>
+  </div>
+  <div class="mft"><button class="btn bp bblk" id="maint-save" onclick="saveMaintItem()">Save</button></div>
+</div>
+</div>
+
+<!-- LOG MAINTENANCE DONE -->
+<div class="ovr" id="m-maint-log">
+<div class="modal">
+  <div class="mhd"><div class="mtl">Mark as Done</div><button class="mclose" onclick="closeMod('m-maint-log')">×</button></div>
+  <div class="mbd">
+    <div id="maint-log-summary" style="margin-bottom:16px;"></div>
+    <div class="fmg">
+      <div class="fg2">
+        <div class="fg"><label class="fl">Date Done</label>
+          <input type="date" class="fi" id="mlog-date">
+        </div>
+        <div class="fg"><label class="fl">Cost</label>
+          <div class="fiw"><div class="fip" id="mlog-pfx">₹</div><input type="number" class="fi" id="mlog-cost" placeholder="0" min="0" step="1"></div>
+        </div>
+      </div>
+      <div class="fg" id="mlog-km-wrap" style="display:none">
+        <label class="fl">Odometer at service (km)</label>
+        <input type="number" class="fi" id="mlog-km" placeholder="e.g. 48000" min="0" step="1">
+      </div>
+      <div class="fg"><label class="fl">Notes</label>
+        <textarea class="fta" id="mlog-notes" rows="2" placeholder="Service centre, parts replaced…"></textarea>
+      </div>
+      <div class="fg">
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;background:var(--gbg);border:1.5px solid #a7f3c0;border-radius:var(--r);">
+          <input type="checkbox" id="mlog-add-expense" checked style="width:16px;height:16px;accent-color:var(--ink);margin-top:2px;flex-shrink:0;">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--grn);">Also add to Personal Expenses</div>
+            <div style="font-size:11px;color:var(--ink3);margin-top:2px;">The cost will appear in your expense list under Health/Maintenance so it counts in your monthly spending.</div>
+          </div>
+        </label>
+      </div>
+    </div>
+  </div>
+  <div class="mft"><button class="btn bp bblk" onclick="saveMaintLog()">Mark as Done</button></div>
+</div>
+</div>
+
 <div class="toasts" id="toasts"></div>
 
 <script>
@@ -734,14 +822,15 @@ function loadDB() {
       const d = JSON.parse(r);
       if (!d.lendHistory)  d.lendHistory  = [];
       if (!d.recurring)    d.recurring    = [];
+      if (!d.maintenance)  d.maintenance  = [];
       return d;
     }
   } catch(_){}
   try {
     const old = localStorage.getItem('sv3');
-    if (old) { const d=JSON.parse(old); d.version=4; d.lendHistory=[]; d.recurring=[]; return d; }
+    if (old) { const d=JSON.parse(old); d.version=4; d.lendHistory=[]; d.recurring=[]; d.maintenance=[]; return d; }
   } catch(_){}
-  return {user:'You',groups:[],personal:[],currency:'₹',budget:0,lendHistory:[],recurring:[],version:4};
+  return {user:'You',groups:[],personal:[],currency:'₹',budget:0,lendHistory:[],recurring:[],maintenance:[],version:4};
 }
 function saveDB() { localStorage.setItem(KEY, JSON.stringify(DB)); }
 
@@ -1108,7 +1197,7 @@ document.querySelectorAll('.ovr').forEach(el =>
 );
 
 // ── VIEWS ────────────────────────────────────
-const VIEWS = ['dash','personal','groups','analytics'];
+const VIEWS = ['dash','personal','groups','analytics','maintain'];
 
 function showView(n) {
   CV = n;
@@ -1126,6 +1215,8 @@ function showView(n) {
     fab.onclick = () => openAddP(null);
   } else if (n === 'groups') {
     fab.onclick = () => CGI ? openAddGE(null) : openMod('m-newg');
+  } else if (n === 'maintain') {
+    fab.onclick = () => openAddMaint(null);
   } else {
     fab.style.display = 'none';
   }
@@ -1134,7 +1225,102 @@ function showView(n) {
   else if (n==='personal')  { buildMonthFilter(); rPersonal(); }
   else if (n==='groups')    rGroups();
   else if (n==='analytics') rAnalytics();
+  else if (n==='maintain')  rMaintain();
   window.scrollTo(0,0);
+}
+
+// Pre-computed dashboard section builders (avoids deeply nested template literals)
+function _dashRecurring(cur) {
+  var all = DB.recurring||[];
+  if (!all.length) return '';
+  var reminders = getRecurringReminders();
+  var html = '<div class="sec" id="rec-section">';
+
+  // Section label
+  var lbl = reminders.length
+    ? '\uD83D\uDD01 Recurring Expenses <span style="color:var(--red);font-family:var(--mono);font-weight:700;">'+reminders.length+' due</span>'
+    : '\uD83D\uDD01 Recurring Expenses';
+  html += '<div class="slb">'+lbl+' <a onclick="openAddRecurring()">+ Add</a></div>';
+
+  // Due banners
+  reminders.forEach(function(r) {
+    var isOver   = r.daysUntil < 0;
+    var isToday  = r.daysUntil === 0;
+    var isSoon   = r.daysUntil <= 3;
+    var cls      = isOver||isToday ? 'remind-card' : isSoon ? 'remind-card warn' : 'remind-card ok';
+    var label    = isOver  ? 'Overdue by '+Math.abs(r.daysUntil)+'d'
+                 : isToday ? 'Due Today'
+                 : 'Due in '+r.daysUntil+'d';
+    var logged   = isAlreadyLoggedThisPeriod(r);
+    var btnHtml  = logged
+      ? '<div style="font-size:11px;font-weight:700;color:var(--grn);font-family:var(--mono);">\u2713 Logged</div>'
+      : '<button class="btn bp bsm rec-log-btn" data-rid="'+esc(r.id)+'" style="font-size:11px;">Log now</button>';
+    html += '<div class="'+cls+'" style="cursor:default;margin-bottom:8px;">'
+      + ciEl(r.cat)
+      + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:13px;font-weight:700;">'+esc(r.name)+'</div>'
+        + '<div style="font-size:11px;color:var(--ink3);font-family:var(--mono);">'+r.freq+' \xB7 '+cur+fmt(r.amount)+'</div>'
+      + '</div>'
+      + '<div style="flex-shrink:0;">'+btnHtml+'</div>'
+    + '</div>';
+  });
+
+  // Full list card
+  html += '<div class="card">';
+  all.slice(0,6).forEach(function(r) {
+    var nextDue    = nextDueDate(r);
+    var daysUntil  = nextDue ? Math.round((nextDue-new Date())/(1000*60*60*24)) : null;
+    var logged     = isAlreadyLoggedThisPeriod(r);
+    var dueLabel   = daysUntil===null ? '\u2013'
+                   : daysUntil<0     ? 'Overdue '+Math.abs(daysUntil)+'d'
+                   : daysUntil===0   ? 'Due today'
+                   : 'Next in '+daysUntil+'d';
+    var dueColor   = daysUntil!==null&&daysUntil<=0 ? 'color:var(--red)'
+                   : daysUntil!==null&&daysUntil<=3  ? 'color:var(--amb)'
+                   : 'color:var(--ink4)';
+    var logBtnHtml = logged
+      ? '<div style="font-size:10px;font-weight:700;color:var(--grn);font-family:var(--mono);margin-top:3px;">\u2713 Logged</div>'
+      : '<button class="btn bxs rec-log-btn" data-rid="'+esc(r.id)+'" style="margin-top:4px;background:var(--gbg);color:var(--grn);border:1px solid #a7f3c0;font-size:10px;font-weight:700;">Log now</button>';
+    html += '<div class="cr rec-edit-row" data-rid="'+esc(r.id)+'" style="cursor:pointer;">'
+      + ciEl(r.cat)
+      + '<div class="cm">'
+        + '<div class="ct">'+esc(r.name)+'</div>'
+        + '<div class="cs"><span style="'+dueColor+'">'+dueLabel+'</span> \xB7 '+r.freq+'</div>'
+      + '</div>'
+      + '<div class="crt">'
+        + '<div class="ca">'+cur+fmt(r.amount)+'</div>'
+        + logBtnHtml
+      + '</div>'
+    + '</div>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
+function _dashMaintReminders(cur) {
+  const mRem = getMaintReminders();
+  if (!mRem.length) return '';
+  var html = '<div class="sec"><div class="slb">\uD83D\uDD27 Maintenance Due <span style="color:var(--red);font-family:var(--mono);font-weight:700;">' + mRem.length + '</span> <a onclick="showView(\'maintain\')">View all \u2192</a></div>';
+  mRem.forEach(function(item) {
+    var isOver  = item.daysUntil < 0;
+    var isToday = item.daysUntil === 0;
+    var cls     = (isOver||isToday) ? 'remind-card' : 'remind-card warn';
+    var lbl     = isOver ? ('Overdue by ' + Math.abs(item.daysUntil) + 'd') : isToday ? 'Due Today!' : ('Due in ' + item.daysUntil + 'd');
+    var col     = (isOver||isToday) ? 'var(--red)' : 'var(--amb)';
+    html += '<div class="' + cls + '" onclick="showView(\'maintain\')" style="cursor:pointer;">'
+      + '<div style="font-size:22px;">' + (item.icon||'\uD83D\uDD27') + '</div>'
+      + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:13px;font-weight:700;">' + esc(item.name) + '</div>'
+        + '<div style="font-size:11px;color:var(--ink3);font-family:var(--mono);">' + esc(item.asset||'') + ' \u00B7 Every ' + item.interval + ' ' + item.unit + '</div>'
+      + '</div>'
+      + '<div style="text-align:right;flex-shrink:0;">'
+        + '<div style="font-size:12px;font-weight:700;color:' + col + ';font-family:var(--mono);">' + lbl + '</div>'
+        + '<button class="btn bp bxs" style="margin-top:5px;font-size:10px;" onclick="event.stopPropagation();openMaintLog(\'' + item.id + '\')">Mark Done</button>'
+      + '</div>'
+    + '</div>';
+  });
+  html += '</div>';
+  return html;
 }
 
 // ═══════════════════════════════════════════════
@@ -1143,11 +1329,9 @@ function showView(n) {
 function rDash() {
   const now  = new Date();
   const cur  = DB.currency;
-  const thisM = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const lastM = (() => {
-    const d = new Date(now.getFullYear(), now.getMonth()-1, 1);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-  })();
+  const thisM = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  const prevD = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const lastM = prevD.getFullYear() + '-' + String(prevD.getMonth()+1).padStart(2,'0');
 
   const allExp  = DB.personal.filter(e => e.cat !== CAT_LEND);
   const thisExp = allExp.filter(e => ym(e.date) === thisM);
@@ -1155,207 +1339,157 @@ function rDash() {
   const thisT   = thisExp.reduce((s,e) => s + +e.amount, 0);
   const lastT   = lastExp.reduce((s,e) => s + +e.amount, 0);
   const diff    = lastT > 0 ? Math.round((thisT-lastT)/lastT*100) : null;
+  const diffTxt = diff!==null ? (diff>0?'▲ '+diff+'% vs last':diff<0?'▼ '+Math.abs(diff)+'% vs last':'Same as last') : 'No prior data';
 
   const owed = DB.groups.reduce((s,g) => { const b=gBal(g,DB.user); return b>0?s+b:s; }, 0);
   const owe  = DB.groups.reduce((s,g) => { const b=gBal(g,DB.user); return b<0?s+Math.abs(b):s; }, 0);
 
   const budget = DB.budget || 0;
-  const budPct = budget > 0 ? Math.min(thisT/budget*100, 100).toFixed(1) : null;
+  const budPct = budget > 0 ? Math.min(thisT/budget*100,100).toFixed(1) : null;
 
-  // Lend tracker — group by person, subtract repayments
+  // Lend tracker
   if (!DB.lendHistory) DB.lendHistory = [];
-  const lends   = DB.personal.filter(e => e.cat === CAT_LEND);
   const lendMap = {};
-  lends.forEach(e => {
-    const p = (e.lendTo || e.desc || '?').trim();
-    lendMap[p] = (lendMap[p] || 0) + +e.amount;
+  DB.personal.filter(e=>e.cat===CAT_LEND).forEach(e => {
+    const p=(e.lendTo||e.desc||'?').trim();
+    lendMap[p]=(lendMap[p]||0)+ +e.amount;
   });
-  // subtract repayments
-  DB.lendHistory.forEach(r => {
-    if (lendMap[r.person] !== undefined) lendMap[r.person] -= +r.amount;
-  });
-  // only show people still owed money
-  const lendRows  = Object.entries(lendMap).filter(([,v]) => v > 0.5).sort((a,b) => b[1]-a[1]);
-  const totalLent = lendRows.reduce((s,[,v]) => s+v, 0);
+  DB.lendHistory.forEach(r => { if(lendMap[r.person]!==undefined) lendMap[r.person]-= +r.amount; });
+  const lendRows  = Object.entries(lendMap).filter(([,v])=>v>0.5).sort((a,b)=>b[1]-a[1]);
+  const totalLent = lendRows.reduce((s,[,v])=>s+v,0);
 
-  // Category totals this month
+  // Category bars
   const catT = Array(CATS.length).fill(0);
-  thisExp.forEach(e => { catT[(e.cat!=null&&e.cat<CATS.length&&e.cat!==CAT_LEND)?e.cat:10] += +e.amount; });
+  thisExp.forEach(e=>{ catT[(e.cat!=null&&e.cat<CATS.length&&e.cat!==CAT_LEND)?e.cat:10]+= +e.amount; });
   const topCats = catT.map((v,i)=>({i,v})).filter(x=>x.v>0&&x.i!==CAT_LEND).sort((a,b)=>b.v-a.v).slice(0,6);
-  const catMax  = topCats[0]?.v || 1;
+  const catMax  = topCats[0]?.v||1;
 
   const recent = [...DB.personal].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
 
-  document.getElementById('v-dash').innerHTML = `<div class="ctn fade">
+  // ── Pre-compute all complex sections as plain strings ──
 
-    <div class="ph">
-      <div class="pt">${now.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}</div>
-      <div class="ps">${now.toLocaleDateString('en-IN',{weekday:'long'})}</div>
-    </div>
+  // Budget bar
+  const budgetHtml = budget>0
+    ? '<div class="budget-bar">'
+      + '<div class="row" style="margin-bottom:9px;">'
+        + '<span style="font-size:12px;font-weight:700;letter-spacing:-.01em;">Monthly Budget</span>'
+        + '<span style="font-family:var(--mono);font-size:12px;font-weight:700;color:'+(+budPct>90?'var(--red)':'var(--ink3)')+';">'
+          + cur+fmt(thisT)+' / '+cur+fmt(budget)
+        + '</span>'
+      + '</div>'
+      + '<div style="height:7px;background:var(--bg3);border-radius:4px;overflow:hidden;">'
+        + '<div style="height:100%;width:'+budPct+'%;border-radius:4px;background:'
+          + (+budPct>90?'var(--red)':+budPct>70?'var(--amb)':'var(--ink)')
+          + ';transition:width .5s;"></div>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--ink4);margin-top:5px;font-family:var(--mono);">'
+        + budPct+'% used \xB7 '+cur+fmt(Math.max(0,budget-thisT))+' remaining'
+      + '</div>'
+    + '</div>'
+    : '';
 
-    <div class="sr sr4">
-      <div class="sc">
-        <div class="sl">This Month</div>
-        <div class="sv">${cur}${fmt(thisT)}</div>
-        <div class="sd">${diff!==null?(diff>0?'▲ '+diff+'% vs last':diff<0?'▼ '+Math.abs(diff)+'% vs last':'Same as last'):'No prior data'}</div>
-      </div>
-      <div class="sc">
-        <div class="sl">Last Month</div>
-        <div class="sv">${cur}${fmt(lastT)}</div>
-        <div class="sd">${lastExp.length} expenses</div>
-      </div>
-      <div class="sc">
-        <div class="sl">Owed to You</div>
-        <div class="sv up">${cur}${fmt(owed)}</div>
-        <div class="sd">From groups</div>
-      </div>
-      <div class="sc">
-        <div class="sl">You Owe</div>
-        <div class="sv ${owe>0?'dn':''}">${cur}${fmt(owe)}</div>
-        <div class="sd">In groups</div>
-      </div>
-    </div>
+  // Recurring section
+  const recHtml = _dashRecurring(cur);
 
-    ${budget>0 ? `
-    <div class="budget-bar">
-      <div class="row" style="margin-bottom:9px;">
-        <span style="font-size:12px;font-weight:700;letter-spacing:-.01em;">Monthly Budget</span>
-        <span style="font-family:var(--mono);font-size:12px;font-weight:700;color:${+budPct>90?'var(--red)':'var(--ink3)'};">${cur}${fmt(thisT)} / ${cur}${fmt(budget)}</span>
-      </div>
-      <div style="height:7px;background:var(--bg3);border-radius:4px;overflow:hidden;">
-        <div style="height:100%;width:${budPct}%;border-radius:4px;background:${+budPct>90?'var(--red)':+budPct>70?'var(--amb)':'var(--ink)'};transition:width .5s;"></div>
-      </div>
-      <div style="font-size:10px;color:var(--ink4);margin-top:5px;font-family:var(--mono);">${budPct}% used · ${cur}${fmt(Math.max(0,budget-thisT))} remaining</div>
-    </div>` : ''}
+  // Maintenance reminders
+  const maintHtml = _dashMaintReminders(cur);
 
-    <!-- RECURRING REMINDERS -->
-    ${(()=>{
-      const all = DB.recurring||[];
-      if (!all.length) return '';
-      const reminders = getRecurringReminders();
-      const secLabel = reminders.length
-        ? `🔔 Recurring <span style="color:var(--red);font-family:var(--mono);font-weight:700;">${reminders.length} due</span>`
-        : '🔁 Recurring';
+  // Lend tracker
+  let lendHtml = '';
+  if (totalLent > 0) {
+    var lendRows2 = '';
+    lendRows.forEach(function(entry) {
+      var p = entry[0], amt = entry[1];
+      var loans = DB.personal.filter(function(e){ return e.cat===CAT_LEND&&(e.lendTo||e.desc||'?').trim()===p; });
+      var oldest = loans.reduce(function(a,b){ return a.date<b.date?a:b; }, loans[0]);
+      var daysSince = oldest ? Math.floor((Date.now()-new Date(oldest.date+'T00:00:00'))/(1000*60*60*24)) : 0;
+      lendRows2 += '<div class="cr" onclick="openLendLedger(\''+esc(p)+'\')">'
+        + '<div style="width:34px;height:34px;border-radius:50%;background:var(--amb);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0;">'
+          + esc(p).charAt(0).toUpperCase()
+        + '</div>'
+        + '<div class="cm"><div class="ct">'+esc(p)+'</div>'
+          + '<div class="cs">Since '+fDate(oldest?oldest.date:'')+' \xB7 '+daysSince+'d</div></div>'
+        + '<div class="crt">'
+          + '<div class="ca" style="color:var(--amb);">'+cur+fmt(amt)+'</div>'
+          + '<button class="btn bg bxs" style="margin-top:4px;" onclick="event.stopPropagation();markRepaid(\''+esc(p)+'\')">Repaid \u2713</button>'
+        + '</div>'
+      + '</div>';
+    });
+    lendHtml = '<div class="card">'
+      + '<div style="padding:10px 15px;background:var(--bg2);border-bottom:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center;">'
+        + '<span style="font-size:10px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Outstanding</span>'
+        + '<span style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--amb);">'+cur+fmt(totalLent)+'</span>'
+      + '</div>'
+      + lendRows2
+    + '</div>';
+  } else {
+    lendHtml = '<div style="padding:14px 16px;background:var(--bg2);border:1.5px dashed var(--brd);border-radius:var(--rl);font-size:12px;color:var(--ink4);text-align:center;">'
+      + 'No active loans. Use <strong>\uD83E\uDD1D Lend</strong> category to track money you give out.'
+    + '</div>';
+  }
 
-      // Reminder banners (due soon / overdue)
-      const remHtml = reminders.map(r => {
-        const urgency = r.daysUntil < 0?'overdue':r.daysUntil===0?'today':r.daysUntil<=3?'soon':'upcoming';
-        const cls     = urgency==='overdue'||urgency==='today'?'remind-card':urgency==='soon'?'remind-card warn':'remind-card ok';
-        const label   = urgency==='overdue'?`Overdue by ${Math.abs(r.daysUntil)}d`:urgency==='today'?'Due Today':urgency==='soon'?`Due in ${r.daysUntil}d`:`Due in ${r.daysUntil}d`;
-        const alreadyLogged = isAlreadyLoggedThisPeriod(r);
-        return `<div class="${cls}" style="cursor:default;margin-bottom:8px;">
-          ${ciEl(r.cat)}
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:700;">${esc(r.name)}</div>
-            <div style="font-size:11px;color:var(--ink3);font-family:var(--mono);">${r.freq} · ${cur}${fmt(r.amount)}</div>
-          </div>
-          <div style="flex-shrink:0;">
-            ${alreadyLogged
-              ? `<div style="font-size:11px;font-weight:700;color:var(--grn);font-family:var(--mono);">✓ Logged</div>`
-              : `<button class="btn bp bsm rec-log-btn" data-rid="${esc(r.id)}" style="font-size:11px;">Log now</button>`
-            }
-          </div>
-        </div>`;
-      }).join('');
+  // Category bars
+  const catBarsHtml = topCats.length
+    ? topCats.map(function(c,i){
+        return '<div class="sbr">'
+          + '<div class="sbl">'+CATS[c.i].e+' '+CATS[c.i].l+'</div>'
+          + '<div class="sbt"><div class="sbf" style="width:'+(c.v/catMax*100).toFixed(1)+'%;background:'+PAL[i%PAL.length]+';"></div></div>'
+          + '<div class="sba">'+cur+fmt(c.v)+'</div>'
+        + '</div>';
+      }).join('')
+    : '<div style="color:var(--ink4);font-size:13px;padding:4px 0;">No expenses this month yet.</div>';
 
-      // All recurring list
-      const listHtml = all.slice(0,6).map(r => {
-        const nextDue = nextDueDate(r);
-        const daysUntil = nextDue ? Math.round((nextDue-new Date())/(1000*60*60*24)) : null;
-        const alreadyLogged = isAlreadyLoggedThisPeriod(r);
-        const dueLabel = daysUntil!==null
-          ? (daysUntil<0?`Overdue ${Math.abs(daysUntil)}d`:daysUntil===0?'Due today':`Next in ${daysUntil}d`)
-          : '–';
-        const dueCls = daysUntil!==null&&daysUntil<=0?'color:var(--red)':daysUntil!==null&&daysUntil<=3?'color:var(--amb)':'color:var(--ink4)';
-        return `<div class="cr rec-edit-row" data-rid="${esc(r.id)}" style="cursor:pointer;">
-          ${ciEl(r.cat)}
-          <div class="cm">
-            <div class="ct">${esc(r.name)}</div>
-            <div class="cs"><span style="${dueCls}">${dueLabel}</span> · ${r.freq}</div>
-          </div>
-          <div class="crt">
-            <div class="ca">${cur}${fmt(r.amount)}</div>
-            ${alreadyLogged
-              ? `<div style="font-size:10px;font-weight:700;color:var(--grn);font-family:var(--mono);margin-top:3px;">✓ Logged</div>`
-              : `<button class="btn bxs rec-log-btn" data-rid="${esc(r.id)}" style="margin-top:4px;background:var(--gbg);color:var(--grn);border:1px solid #a7f3c0;font-size:10px;font-weight:700;">Log now</button>`
-            }
-          </div>
-        </div>`;
-      }).join('');
+  // ── Assemble dashboard ──
+  document.getElementById('v-dash').innerHTML =
+    '<div class="ctn fade">'
 
-      return `<div class="sec" id="rec-section">
-        <div class="slb">${secLabel} <a onclick="openAddRecurring()">+ Add</a></div>
-        ${remHtml}
-        <div class="card">${listHtml}</div>
-      </div>`;
-    })()}
+    + '<div class="ph">'
+      + '<div class="pt">'+now.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})+'</div>'
+      + '<div class="ps">'+now.toLocaleDateString('en-IN',{weekday:'long'})+'</div>'
+    + '</div>'
 
-    <!-- LEND TRACKER -->
-    <div class="sec">
-      <div class="slb">🤝 Lend Tracker <a onclick="openAddP(null,'lend')">+ Add</a></div>
-      ${totalLent > 0 ? `
-      <div class="card">
-        <div style="padding:10px 15px;background:var(--bg2);border-bottom:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:10px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Outstanding</span>
-          <span style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--amb);">${cur}${fmt(totalLent)}</span>
-        </div>
-        ${lendRows.map(([p,amt]) => {
-          const loans = DB.personal.filter(e=>e.cat===CAT_LEND&&(e.lendTo||e.desc||'?').trim()===p);
-          const oldest = loans.reduce((a,b)=>a.date<b.date?a:b, loans[0]);
-          const daysSince = oldest ? Math.floor((Date.now()-new Date(oldest.date+'T00:00:00'))/(1000*60*60*24)) : 0;
-          return `
-        <div class="cr" onclick="openLendLedger('${esc(p)}')">
-          <div style="width:34px;height:34px;border-radius:50%;background:var(--amb);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0;">${esc(p).charAt(0).toUpperCase()}</div>
-          <div class="cm">
-            <div class="ct">${esc(p)}</div>
-            <div class="cs">Since ${fDate(oldest?.date||'')} · ${daysSince}d</div>
-          </div>
-          <div class="crt">
-            <div class="ca" style="color:var(--amb);">${cur}${fmt(amt)}</div>
-            <button class="btn bg bxs" style="margin-top:4px;" onclick="event.stopPropagation();markRepaid('${esc(p)}')">Repaid ✓</button>
-          </div>
-        </div>`}).join('')}
-      </div>` : `
-      <div style="padding:14px 16px;background:var(--bg2);border:1.5px dashed var(--brd);border-radius:var(--rl);font-size:12px;color:var(--ink4);text-align:center;">
-        No active loans recorded. Use <strong>🤝 Lend</strong> category to track money you give out.
-      </div>`}
-    </div>
+    + '<div class="sr sr4">'
+      + '<div class="sc"><div class="sl">This Month</div><div class="sv">'+cur+fmt(thisT)+'</div><div class="sd">'+diffTxt+'</div></div>'
+      + '<div class="sc"><div class="sl">Last Month</div><div class="sv">'+cur+fmt(lastT)+'</div><div class="sd">'+lastExp.length+' expenses</div></div>'
+      + '<div class="sc"><div class="sl">Owed to You</div><div class="sv up">'+cur+fmt(owed)+'</div><div class="sd">From groups</div></div>'
+      + '<div class="sc"><div class="sl">You Owe</div><div class="sv '+(owe>0?'dn':'')+'">'+cur+fmt(owe)+'</div><div class="sd">In groups</div></div>'
+    + '</div>'
 
-    <!-- MONTHLY CHART -->
-    <div class="sec">
-      <div class="slb">Monthly Spending</div>
-      <div class="cc">
-        <div class="cch">This Year <span id="d-ytotal"></span></div>
-        <div class="cw"><canvas id="c-dash"></canvas></div>
-      </div>
-    </div>
+    + budgetHtml
 
-    <!-- TOP CATEGORIES -->
-    <div class="sec">
-      <div class="slb">This Month by Category <a onclick="showView('analytics')">Full analytics →</a></div>
-      ${topCats.length ? topCats.map((c,i) => `
-      <div class="sbr">
-        <div class="sbl">${CATS[c.i].e} ${CATS[c.i].l}</div>
-        <div class="sbt"><div class="sbf" style="width:${(c.v/catMax*100).toFixed(1)}%;background:${PAL[i%PAL.length]};"></div></div>
-        <div class="sba">${cur}${fmt(c.v)}</div>
-      </div>`).join('') : '<div style="color:var(--ink4);font-size:13px;padding:4px 0;">No expenses this month yet.</div>'}
-    </div>
+    + recHtml
 
-    <!-- RECENT -->
-    <div class="sec">
-      <div class="slb">Recent Expenses <a onclick="showView('personal')">All →</a></div>
-      <div class="card" id="d-recent"></div>
-    </div>
+    + maintHtml
 
-  </div>`;
+    + '<div class="sec">'
+      + '<div class="slb">\uD83E\uDD1D Lend Tracker <a onclick="openAddP(null,\'lend\')">+ Add</a></div>'
+      + lendHtml
+    + '</div>'
+
+    + '<div class="sec">'
+      + '<div class="slb">Monthly Spending</div>'
+      + '<div class="cc"><div class="cch">This Year <span id="d-ytotal"></span></div><div class="cw"><canvas id="c-dash"></canvas></div></div>'
+    + '</div>'
+
+    + '<div class="sec">'
+      + '<div class="slb">This Month by Category <a onclick="showView(\'analytics\')">Full analytics \u2192</a></div>'
+      + catBarsHtml
+    + '</div>'
+
+    + '<div class="sec">'
+      + '<div class="slb">Recent Expenses <a onclick="showView(\'personal\')">All \u2192</a></div>'
+      + '<div class="card" id="d-recent"></div>'
+    + '</div>'
+
+    + '</div>';
 
   // Bar chart
   const yr  = now.getFullYear();
   const mly = Array(12).fill(0);
-  allExp.filter(e => e.date.startsWith(String(yr))).forEach(e => {
-    mly[parseInt(e.date.split('-')[1])-1] += +e.amount;
+  allExp.filter(e=>e.date.startsWith(String(yr))).forEach(e=>{
+    mly[parseInt(e.date.split('-')[1])-1]+= +e.amount;
   });
-  document.getElementById('d-ytotal').textContent = `${cur}${fmt(mly.reduce((a,b)=>a+b,0))} total`;
+  document.getElementById('d-ytotal').textContent = cur+fmt(mly.reduce((a,b)=>a+b,0))+' total';
   dChart('c-dash');
   CI['c-dash'] = new Chart(document.getElementById('c-dash'), {
     type:'bar',
@@ -1364,17 +1498,19 @@ function rDash() {
   });
 
   // Recent list
-  document.getElementById('d-recent').innerHTML = recent.length ? recent.map(e => {
-    const isLend = e.cat === CAT_LEND;
-    return `<div class="cr" onclick="openPDet('${e.id}')">
-      ${ciEl(e.cat)}
-      <div class="cm">
-        <div class="ct">${esc(e.desc)}</div>
-        <div class="cs">${cat(e.cat).l}${isLend&&e.lendTo?' → '+esc(e.lendTo):''} · ${fDate(e.date)}</div>
-      </div>
-      <div class="crt"><div class="ca" style="color:${isLend?'var(--amb)':'var(--ink)'};">${cur}${fmt(e.amount)}</div></div>
-    </div>`;
-  }).join('') : `<div class="empty"><div class="ei">📋</div><div class="ett">No activity yet</div><div class="esb">Tap + on Personal to add expenses.</div></div>`;
+  document.getElementById('d-recent').innerHTML = recent.length
+    ? recent.map(e => {
+        const isLend = e.cat===CAT_LEND;
+        return '<div class="cr" onclick="openPDet(\''+e.id+'\')">'
+          + ciEl(e.cat)
+          + '<div class="cm">'
+            + '<div class="ct">'+esc(e.desc)+'</div>'
+            + '<div class="cs">'+cat(e.cat).l+(isLend&&e.lendTo?' \u2192 '+esc(e.lendTo):'')+' \xB7 '+fDate(e.date)+'</div>'
+          + '</div>'
+          + '<div class="crt"><div class="ca" style="color:'+(isLend?'var(--amb)':'var(--ink)')+';">'+cur+fmt(e.amount)+'</div></div>'
+        + '</div>';
+      }).join('')
+    : '<div class="empty"><div class="ei">\uD83D\uDCCB</div><div class="ett">No activity yet</div><div class="esb">Tap + to add your first expense.</div></div>';
 }
 
 // Persistent delegated handler for recurring buttons on dashboard
@@ -1449,8 +1585,7 @@ function _renderLendLedger() {
     : null;
 
   document.getElementById('lend-body').innerHTML = `
-    <!-- Summary row -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;">
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;">
       <div class="sumc">
         <div class="sumcl">Lent</div>
         <div class="sumcv" style="color:var(--amb);">${cur}${fmt(totalLent)}</div>
@@ -1483,12 +1618,9 @@ function _renderLendLedger() {
         <div style="font-size:11px;color:var(--amb);font-family:var(--mono);">Lent ${fDate(firstLend)} · ${daysOpen} days ago · ${cur}${fmt(outstanding)} remaining</div>
       </div>
     </div>` : ''}
-
-    <!-- Timeline -->
-    <div class="slb" style="margin-bottom:10px;">Transaction Timeline</div>
+<div class="slb" style="margin-bottom:10px;">Transaction Timeline</div>
     <div style="position:relative;padding-left:24px;">
-      <!-- vertical line -->
-      <div style="position:absolute;left:7px;top:8px;bottom:8px;width:2px;background:var(--brd);border-radius:1px;"></div>
+<div style="position:absolute;left:7px;top:8px;bottom:8px;width:2px;background:var(--brd);border-radius:1px;"></div>
       ${timeline.map((t,idx) => {
         const isLend  = t.type==='lend';
         const dotCol  = isLend ? 'var(--amb)' : 'var(--grn)';
@@ -2496,6 +2628,341 @@ function clearAll(){
   DB={user:'You',groups:[],personal:[],currency:'₹',budget:0,version:4};
   saveDB(); closeMod('m-bkp'); toast('All data cleared'); showView('dash');
 }
+
+
+// ═══════════════════════════════════════════════
+// MAINTENANCE TRACKER
+// ═══════════════════════════════════════════════
+const MAINT_ICONS = ['🚗','🏍️','🚲','❄️','🔧','🏠','💧','⚡','🔥','🌿','🖥️','📱','🛁','🔋','🎛️','🧯'];
+let MAINT_ICON_IDX = 0;
+let MAINT_EID      = null;
+let MAINT_LOG_ID   = null;
+
+function maintDueDate(item) {
+  if (!item.lastDate) return null;
+  const d = new Date(item.lastDate + 'T00:00:00');
+  const n = +item.interval || 1;
+  switch(item.unit) {
+    case 'days':   d.setDate(d.getDate()+n); break;
+    case 'weeks':  d.setDate(d.getDate()+n*7); break;
+    case 'months': d.setMonth(d.getMonth()+n); break;
+    case 'years':  d.setFullYear(d.getFullYear()+n); break;
+    default: return null;
+  }
+  return d;
+}
+function maintDaysUntil(item) {
+  const due = maintDueDate(item); if (!due) return null;
+  return Math.round((due - new Date())/(1000*60*60*24));
+}
+function maintStatus(item) {
+  const d = maintDaysUntil(item);
+  if (!item.lastDate)  return {label:'Never serviced', color:'var(--ink4)'};
+  if (d === null)      return {label:'KM based',        color:'var(--ink4)'};
+  if (d < 0)           return {label:`Overdue ${Math.abs(d)}d`, color:'var(--red)'};
+  if (d === 0)         return {label:'Due Today!',       color:'var(--red)'};
+  if (d <= 7)          return {label:`Due in ${d}d`,     color:'var(--amb)'};
+  if (d <= 30)         return {label:`Due in ${d}d`,     color:'#1a7a3c'};
+  return                      {label:`Due in ${d}d`,     color:'var(--ink4)'};
+}
+function totalMaintCost(item) {
+  // history is always seeded with the initial entry when lastDate+lastCost are provided
+  // so just sum history — this is the single source of truth
+  return (item.history||[]).reduce((s,h)=>s+(+h.cost||0),0);
+}
+function getMaintReminders() {
+  return (DB.maintenance||[])
+    .map(i=>({...i, daysUntil:maintDaysUntil(i)}))
+    .filter(i=>i.daysUntil!==null && i.daysUntil<=14)  // warn 2 weeks out
+    .sort((a,b)=>a.daysUntil-b.daysUntil);
+}
+
+function rMaintain() {
+  const items = DB.maintenance||[];
+  const cur   = DB.currency;
+  const sorted = [...items].sort((a,b)=>(maintDaysUntil(a)??9999)-(maintDaysUntil(b)??9999));
+  const byAsset = {};
+  sorted.forEach(item => {
+    const k = item.asset||'General';
+    (byAsset[k]=byAsset[k]||[]).push(item);
+  });
+  const overdue   = items.filter(i=>{const d=maintDaysUntil(i);return d!==null&&d<0;}).length;
+  const dueSoon   = items.filter(i=>{const d=maintDaysUntil(i);return d!==null&&d>=0&&d<=7;}).length;
+  const totalSpent= items.reduce((s,i)=>s+totalMaintCost(i),0);
+
+  document.getElementById('v-maintain').innerHTML = `<div class="ctn fade">
+    <div class="ph row">
+      <div><div class="pt">Maintenance</div><div class="ps">Service history & reminders</div></div>
+    </div>
+    <div class="sr" style="grid-template-columns:repeat(3,1fr);">
+      <div class="sc"><div class="sl">Tracked</div><div class="sv">${items.length}</div></div>
+      <div class="sc"><div class="sl">Overdue</div><div class="sv ${overdue>0?'dn':''}">${overdue}</div><div class="sd">${dueSoon} due soon</div></div>
+      <div class="sc"><div class="sl">Total Spent</div><div class="sv">${cur}${fmt(totalSpent)}</div></div>
+    </div>
+    ${!items.length ? `
+    <div class="empty">
+      <div class="ei">🔧</div>
+      <div class="ett">Nothing tracked yet</div>
+      <div class="esb">Add your car, AC, bike — get reminders before service is due and track what you spend.</div>
+      <button class="btn bp" onclick="openAddMaint(null)">+ Add First Item</button>
+    </div>` :
+    Object.entries(byAsset).map(([asset,aItems])=>`
+    <div class="sec">
+      <div class="slb">${esc(asset)} <span class="badge">${aItems.length}</span></div>
+      <div style="display:grid;gap:10px;">${aItems.map(item=>_maintCard(item,cur)).join('')}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function _maintCard(item, cur) {
+  const st      = maintStatus(item);
+  const due     = maintDueDate(item);
+  const dl      = maintDaysUntil(item);
+  const hist    = item.history||[];
+  const lastCost= hist.length ? hist[hist.length-1].cost : (item.lastCost||0);
+  const total   = totalMaintCost(item);
+  const isOver  = dl!==null&&dl<0;
+  const isSoon  = dl!==null&&dl>=0&&dl<=7;
+  const borderCol = isOver?'#fcc':isSoon?'#fcd9a0':'var(--brd)';
+  const barCol    = isOver?'var(--red)':isSoon?'var(--amb)':'var(--grn)';
+  let pct = 0;
+  if(item.lastDate && due) {
+    const last = new Date(item.lastDate+'T00:00:00');
+    pct = Math.min(100, Math.max(0, ((new Date()-last)/(due-last))*100));
+  }
+  return `<div style="background:var(--bg);border:1.5px solid ${borderCol};border-radius:var(--rl);overflow:hidden;">
+<div style="display:flex;align-items:flex-start;gap:12px;padding:14px 15px 10px;">
+      <div style="width:44px;height:44px;border-radius:10px;background:var(--bg3);display:grid;place-items:center;font-size:22px;flex-shrink:0;">${item.icon||'🔧'}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:15px;font-weight:800;letter-spacing:-.03em;">${esc(item.name)}</div>
+        ${item.asset?`<div style="font-size:11px;color:var(--ink3);font-family:var(--mono);margin-top:1px;">📌 ${esc(item.asset)}</div>`:''}
+        <div style="font-size:11px;color:var(--ink4);font-family:var(--mono);margin-top:2px;">🔄 Every ${item.interval} ${item.unit}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;padding-top:2px;">
+        <div style="font-size:12px;font-weight:700;color:${st.color};font-family:var(--mono);">${st.label}</div>
+        ${due?`<div style="font-size:10px;color:var(--ink4);font-family:var(--mono);margin-top:2px;">📅 ${fDate(due.toISOString().slice(0,10))}</div>`:''}
+      </div>
+    </div>
+${item.lastDate&&due?`<div style="padding:0 15px 12px;">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink4);font-family:var(--mono);margin-bottom:5px;">
+        <span>Last service: ${fDate(item.lastDate)}</span>
+        <span>Next due: ${fDate(due.toISOString().slice(0,10))}</span>
+      </div>
+      <div style="height:7px;background:var(--bg3);border-radius:4px;overflow:hidden;">
+        <div style="height:100%;width:${pct.toFixed(1)}%;background:${barCol};border-radius:4px;transition:width .4s;"></div>
+      </div>
+      <div style="font-size:10px;color:var(--ink4);font-family:var(--mono);margin-top:4px;text-align:right;">${pct.toFixed(0)}% of interval elapsed</div>
+    </div>`:''}
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--brd);">
+      <div style="padding:10px 12px;border-right:1px solid var(--brd);">
+        <div style="font-size:9px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Last Done</div>
+        <div style="font-size:12px;font-weight:700;margin-top:3px;font-family:var(--mono);">${item.lastDate?fDate(item.lastDate):'Never'}</div>
+      </div>
+      <div style="padding:10px 12px;border-right:1px solid var(--brd);">
+        <div style="font-size:9px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Last Cost</div>
+        <div style="font-size:12px;font-weight:700;margin-top:3px;font-family:var(--mono);">${lastCost?cur+fmt(lastCost):'–'}</div>
+      </div>
+      <div style="padding:10px 12px;">
+        <div style="font-size:9px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Total Spent</div>
+        <div style="font-size:12px;font-weight:700;margin-top:3px;font-family:var(--mono);">${total?cur+fmt(total):'–'}</div>
+      </div>
+    </div>
+<div style="display:flex;gap:8px;padding:10px 15px;border-top:1px solid var(--brd);background:var(--bg2);flex-wrap:wrap;">
+      <button class="btn bp bsm" style="flex:1;justify-content:center;min-width:100px;" onclick="openMaintLog('${item.id}')">✓ Mark as Done</button>
+      <button class="btn bg bsm" onclick="openAddMaint('${item.id}')">✏️ Edit</button>
+      ${hist.length?`<button class="btn bg bsm" onclick="openMaintHistory('${item.id}')">📋 History (${hist.length})</button>`:''}
+      <button class="btn bd bsm" onclick="deleteMaintItem('${item.id}')">🗑️ Delete</button>
+    </div>
+  </div>`;
+}
+
+function openAddMaint(editId) {
+  MAINT_EID = editId||null; MAINT_ICON_IDX = 0;
+  const item = editId?(DB.maintenance||[]).find(x=>x.id===editId):null;
+  if(item) {
+    MAINT_ICON_IDX = Math.max(0, MAINT_ICONS.indexOf(item.icon));
+    document.getElementById('maint-name').value     = item.name;
+    document.getElementById('maint-asset').value    = item.asset||'';
+    document.getElementById('maint-last').value     = item.lastDate||'';
+    document.getElementById('maint-cost').value     = item.lastCost||'';
+    document.getElementById('maint-interval').value = item.interval||'';
+    document.getElementById('maint-unit').value     = item.unit||'months';
+    document.getElementById('maint-km').value       = item.currentKm||'';
+    document.getElementById('maint-notes').value    = item.notes||'';
+  } else {
+    ['maint-name','maint-asset','maint-last','maint-cost','maint-interval','maint-km','maint-notes'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('maint-unit').value = 'months';
+  }
+  document.getElementById('maint-ttl').textContent  = editId?'Edit Item':'Add Item';
+  document.getElementById('maint-save').textContent = editId?'Update':'Save';
+  document.getElementById('maint-pfx').textContent  = DB.currency;
+  _renderMaintIcons();
+  document.getElementById('maint-km-wrap').style.display =
+    document.getElementById('maint-unit').value==='km'?'grid':'none';
+  openMod('m-maint');
+  setTimeout(()=>document.getElementById('maint-name').focus(), 280);
+}
+
+function _renderMaintIcons() {
+  const el = document.getElementById('maint-icons'); if(!el) return;
+  el.innerHTML = MAINT_ICONS.map((e,i)=>
+    `<button class="catb ${i===MAINT_ICON_IDX?'sel':''}" onclick="MAINT_ICON_IDX=${i};_renderMaintIcons()">${e}</button>`
+  ).join('');
+}
+
+document.addEventListener('change', e => {
+  if(e.target.id==='maint-unit')
+    document.getElementById('maint-km-wrap').style.display = e.target.value==='km'?'grid':'none';
+});
+
+function saveMaintItem() {
+  const name     = document.getElementById('maint-name').value.trim();
+  const interval = parseInt(document.getElementById('maint-interval').value);
+  const lastDate = document.getElementById('maint-last').value||'';
+  const lastCost = parseFloat(document.getElementById('maint-cost').value)||0;
+  if(!name)             { toast('Enter a name'); return; }
+  if(!interval||interval<1) { toast('Enter reminder interval (e.g. 3 months)'); return; }
+  if(!DB.maintenance)   DB.maintenance=[];
+  const existing = MAINT_EID ? (DB.maintenance.find(x=>x.id===MAINT_EID)||{}) : {};
+
+  // Seed history with the initial "last service" entry when creating a new item
+  // so that the cost counts in Total Spent from day one
+  let history = existing.history ? [...existing.history] : [];
+  if(!MAINT_EID && lastDate && lastCost>0) {
+    // New item — create a seed history entry for the known last service
+    history = [{
+      id: uid(), date: lastDate, cost: lastCost, km: parseFloat(document.getElementById('maint-km').value)||0,
+      notes: 'Initial entry (last known service)', loggedAt: new Date().toISOString()
+    }];
+  } else if(MAINT_EID && existing.history?.length===0 && lastDate && lastCost>0) {
+    // Editing an item that had no history — seed it now
+    history = [{
+      id: uid(), date: lastDate, cost: lastCost, km: 0,
+      notes: 'Initial entry', loggedAt: new Date().toISOString()
+    }];
+  }
+
+  const obj = {
+    id:        MAINT_EID||uid(),
+    icon:      MAINT_ICONS[MAINT_ICON_IDX],
+    name,
+    asset:     document.getElementById('maint-asset').value.trim(),
+    lastDate,
+    lastCost,
+    interval,
+    unit:      document.getElementById('maint-unit').value,
+    currentKm: parseFloat(document.getElementById('maint-km').value)||0,
+    notes:     document.getElementById('maint-notes').value.trim(),
+    history,
+    createdAt: existing.createdAt||new Date().toISOString()
+  };
+  if(MAINT_EID) { const idx=DB.maintenance.findIndex(x=>x.id===MAINT_EID); if(idx>=0)DB.maintenance[idx]=obj; }
+  else DB.maintenance.unshift(obj);
+  saveDB(); closeMod('m-maint'); toast(MAINT_EID?'Updated ✓':'Added ✓'); rMaintain();
+}
+
+function deleteMaintItem(id) {
+  const item = (DB.maintenance||[]).find(x=>x.id===id);
+  DB.maintenance = (DB.maintenance||[]).filter(x=>x.id!==id);
+  saveWithUndo(`"${item?.name||'Item'}" deleted`, rMaintain);
+  rMaintain();
+}
+
+function openMaintLog(id) {
+  MAINT_LOG_ID = id;
+  const item = (DB.maintenance||[]).find(x=>x.id===id); if(!item) return;
+  const st = maintStatus(item);
+  document.getElementById('maint-log-summary').innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg2);border:1.5px solid var(--brd);border-radius:var(--rl);margin-bottom:4px;">
+      <div style="font-size:28px;">${item.icon||'🔧'}</div>
+      <div>
+        <div style="font-size:14px;font-weight:700;">${esc(item.name)}</div>
+        <div style="font-size:11px;color:${st.color};font-family:var(--mono);margin-top:2px;">${st.label}</div>
+        ${item.lastDate?`<div style="font-size:11px;color:var(--ink4);font-family:var(--mono);">Last: ${fDate(item.lastDate)}</div>`:'<div style="font-size:11px;color:var(--ink4);font-family:var(--mono);">First service record</div>'}
+      </div>
+    </div>`;
+  document.getElementById('mlog-date').value  = tday();
+  document.getElementById('mlog-cost').value  = '';
+  document.getElementById('mlog-km').value    = item.currentKm||'';
+  document.getElementById('mlog-notes').value = '';
+  document.getElementById('mlog-pfx').textContent = DB.currency;
+  document.getElementById('mlog-km-wrap').style.display = item.unit==='km'?'grid':'none';
+  document.getElementById('mlog-add-expense').checked = true;
+  openMod('m-maint-log');
+}
+
+function saveMaintLog() {
+  const item = (DB.maintenance||[]).find(x=>x.id===MAINT_LOG_ID); if(!item) return;
+  const date  = document.getElementById('mlog-date').value||tday();
+  const cost  = parseFloat(document.getElementById('mlog-cost').value)||0;
+  const km    = parseFloat(document.getElementById('mlog-km').value)||0;
+  const notes = document.getElementById('mlog-notes').value.trim();
+  if(!item.history) item.history=[];
+  item.history.push({id:uid(), date, cost, km, notes, loggedAt:new Date().toISOString()});
+  item.lastDate = date;
+  item.lastCost = cost;
+  if(km) item.currentKm = km;
+
+  const addExpense = document.getElementById('mlog-add-expense').checked && cost>0;
+  if(addExpense) {
+    DB.personal.unshift({
+      id:uid(),
+      desc:`${item.name}${item.asset?' — '+item.asset:''}`,
+      amount:cost, date, cat:5, lendTo:'',
+      notes:notes||`Maintenance: ${item.name}`,
+      createdAt:new Date().toISOString()
+    });
+  }
+  saveDB();
+  closeMod('m-maint-log');
+  // Clear success message
+  if(addExpense) {
+    toast(`✓ ${item.name} done · ${DB.currency}${fmt(cost)} added to expenses`);
+  } else {
+    toast(`✓ ${item.name} marked as done`);
+  }
+  rMaintain();
+}
+
+function openMaintHistory(id) {
+  const item = (DB.maintenance||[]).find(x=>x.id===id); if(!item) return;
+  const cur  = DB.currency;
+  const hist = [...(item.history||[])].reverse();
+  document.getElementById('m-det-body').innerHTML = `
+    <div style="text-align:center;padding:12px 0 14px;">
+      <div style="font-size:34px;">${item.icon||'🔧'}</div>
+      <div style="font-size:17px;font-weight:800;letter-spacing:-.04em;margin-top:8px;">${esc(item.name)}</div>
+      <div style="font-size:11px;color:var(--ink4);font-family:var(--mono);margin-top:3px;">${esc(item.asset||'')} · Every ${item.interval} ${item.unit}</div>
+    </div>
+    ${hist.length ? `
+    <div class="slb" style="margin-bottom:8px;">Service History</div>
+    <div style="display:grid;gap:8px;">
+      ${hist.map((h,i)=>`
+      <div style="background:var(--bg2);border:1.5px solid var(--brd);border-radius:var(--rl);padding:12px 14px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div style="min-width:0;">
+            <div style="font-size:13px;font-weight:700;">${fDate(h.date)}</div>
+            ${h.km?`<div style="font-size:11px;color:var(--ink4);font-family:var(--mono);">${fmt(h.km)} km</div>`:''}
+            ${h.notes?`<div style="font-size:12px;color:var(--ink3);margin-top:3px;white-space:pre-wrap;">${esc(h.notes)}</div>`:''}
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:${h.cost?'var(--ink)':'var(--ink4)'};">${h.cost?cur+fmt(h.cost):'Free'}</div>
+            ${i===0?'<div style="font-size:10px;color:var(--grn);font-family:var(--mono);font-weight:700;">Latest</div>':''}
+          </div>
+        </div>
+      </div>`).join('')}
+    </div>
+    <div style="margin-top:12px;padding:11px 14px;background:var(--bg2);border:1.5px solid var(--brd);border-radius:var(--rl);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:12px;font-weight:700;">Total spent on ${esc(item.name)}</span>
+      <span style="font-family:var(--mono);font-size:14px;font-weight:700;">${cur}${fmt(totalMaintCost(item))}</span>
+    </div>` :
+    '<div style="text-align:center;padding:24px;color:var(--ink4);font-size:13px;">No history yet.<br>Tap "Mark Done" after each service.</div>'}`;
+  document.getElementById('det-edit').textContent = 'Edit Item';
+  document.getElementById('det-edit').onclick = ()=>{ closeMod('m-det'); openAddMaint(id); };
+  document.querySelector('#m-det .mft .bd').onclick = ()=>{ closeMod('m-det'); deleteMaintItem(id); };
+  openMod('m-det');
+}
+
 
 // ═══════════════════════════════════════════════
 // INIT
