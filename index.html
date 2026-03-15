@@ -148,6 +148,7 @@ body{
 .ci-8{background:#fde8d8}  /* Coffee — peach */
 .ci-9{background:#d1fae5}  /* Lend — mint */
 .ci-10{background:#f1f5f9} /* Other — slate */
+.ci-11{background:#fef3c7} /* Maintenance — amber */
 .cm{flex:1;min-width:0}
 .ct{font-size:14px;font-weight:600;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cs{font-size:11px;color:var(--ink4);margin-top:1px;font-family:var(--mono)}
@@ -703,6 +704,7 @@ body{
         </div>
         <div class="fg"><label class="fl">Cost Last Time</label>
           <div class="fiw"><div class="fip" id="maint-pfx">₹</div><input type="number" class="fi" id="maint-cost" placeholder="0" min="0" step="1"></div>
+          <div style="font-size:10px;color:var(--grn);font-family:var(--mono);margin-top:4px;">✓ Will be added to expenses on that date</div>
         </div>
       </div>
       <div class="fg"><label class="fl">Remind me every</label>
@@ -767,6 +769,18 @@ body{
 </div>
 </div>
 
+<!-- MAINTENANCE HISTORY -->
+<div class="ovr" id="m-maint-hist">
+<div class="modal">
+  <div class="mhd"><div class="mtl" id="mhist-ttl">Service History</div><button class="mclose" onclick="closeMod('m-maint-hist')">×</button></div>
+  <div class="mbd" id="mhist-body"></div>
+  <div class="mft" style="display:flex;gap:8px;">
+    <button class="btn bg" style="flex:1;justify-content:center" id="mhist-edit">✏️ Edit Item</button>
+    <button class="btn bd" style="flex:1;justify-content:center" id="mhist-del">🗑️ Delete</button>
+  </div>
+</div>
+</div>
+
 <div class="toasts" id="toasts"></div>
 
 <script>
@@ -789,9 +803,16 @@ const CATS = [
   {e:'☕',l:'Coffee'},    // 8
   {e:'🤝',l:'Lend'},      // 9
   {e:'📦',l:'Other'},     // 10
+  {e:'🔧',l:'Maintenance'}, // 11
 ];
-const CAT_LEND = 9;
-const GICONS = ['🏖️','🏠','✈️','🍕','🎉','💼','🚗','🎮','🏋️','🎯','🌿','🎸','📚','🐾','💡','🎓'];
+const CAT_LEND  = 9;
+const CAT_MAINT = 11;
+const GICONS = [
+  {e:'🏖️',l:'Beach'},  {e:'🏠',l:'Home'},   {e:'✈️',l:'Travel'}, {e:'🍕',l:'Food'},
+  {e:'🎉',l:'Party'},  {e:'💼',l:'Work'},    {e:'🚗',l:'Car'},    {e:'🎮',l:'Gaming'},
+  {e:'🏋️',l:'Gym'},   {e:'🎯',l:'Goals'},   {e:'🌿',l:'Nature'}, {e:'🎸',l:'Music'},
+  {e:'📚',l:'Study'},  {e:'🐾',l:'Pets'},    {e:'💡',l:'Ideas'},  {e:'🎓',l:'College'},
+];
 const AVC    = ['#0a0a0a','#1a3dc0','#1a7a3c','#c0392b','#9a5000','#6d28d9','#0891b2','#be185d','#065f46','#7c2d12'];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const FMON   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -1797,28 +1818,36 @@ function initPersonalView() {
 function openPDet(id) {
   CEI=id; CGI=null;
   const e = DB.personal.find(x=>x.id===id); if (!e) return;
-  const isLend = e.cat===CAT_LEND;
 
-  // For lend entries — show the full ledger for that person
-  if (isLend) {
-    const person = (e.lendTo || e.desc || '?').trim();
-    openLendLedger(person);
+  // Lend entries → open ledger instead
+  if (e.cat===CAT_LEND) {
+    openLendLedger((e.lendTo||e.desc||'?').trim());
     return;
   }
 
   const cur = DB.currency;
-  document.getElementById('m-det-body').innerHTML = `
-    <div style="text-align:center;padding:14px 0 18px;">
-      ${bigIcon(e.cat)}
-      <div style="font-size:26px;font-weight:800;letter-spacing:-.05em;">${cur}${fmt(e.amount)}</div>
-      <div style="color:var(--ink4);font-size:13px;margin-top:4px;">${esc(e.desc)}</div>
-    </div>
-    <div>
-      <div class="dr"><div class="dlb">Category</div><div class="dv">${cat(e.cat).e} ${cat(e.cat).l}</div></div>
-      <div class="dr"><div class="dlb">Date</div><div class="dv">${fDate(e.date)}</div></div>
-      ${e.notes?`<div class="dr"><div class="dlb">Notes</div><div class="dv">${esc(e.notes)}</div></div>`:''}
-    </div>`;
-  document.getElementById('det-edit').onclick = () => { closeMod('m-det'); openAddP(id); };
+  const isMaint = e.cat===CAT_MAINT && e.maintItemId;
+  const maintItem = isMaint ? (DB.maintenance||[]).find(x=>x.id===e.maintItemId) : null;
+
+  document.getElementById('m-det-body').innerHTML =
+    '<div style="text-align:center;padding:14px 0 18px;">'
+    + bigIcon(e.cat)
+    + '<div style="font-size:26px;font-weight:800;letter-spacing:-.05em;">' + cur + fmt(e.amount) + '</div>'
+    + '<div style="color:var(--ink4);font-size:13px;margin-top:4px;">' + esc(e.desc) + '</div>'
+    + '</div>'
+    + '<div>'
+    + '<div class="dr"><div class="dlb">Category</div><div class="dv">' + cat(e.cat).e + ' ' + cat(e.cat).l + '</div></div>'
+    + '<div class="dr"><div class="dlb">Date</div><div class="dv">' + fDate(e.date) + '</div></div>'
+    + (e.notes ? '<div class="dr"><div class="dlb">Notes</div><div class="dv">' + esc(e.notes) + '</div></div>' : '')
+    + (maintItem ? '<div class="dr"><div class="dlb">From Maintenance</div><div class="dv" style="color:var(--amb);">🔧 ' + esc(maintItem.name) + '</div></div>' : '')
+    + (isMaint && !maintItem ? '<div class="dr"><div class="dlb">Note</div><div class="dv" style="color:var(--ink4);font-size:12px;">Maintenance item was deleted</div></div>' : '')
+    + '</div>';
+
+  // ALWAYS reset both buttons to their correct handlers for personal expenses
+  document.getElementById('det-edit').textContent = 'Edit';
+  document.getElementById('det-edit').onclick = function() { closeMod('m-det'); openAddP(id); };
+  document.querySelector('#m-det .mft .bd').textContent = 'Delete';
+  document.querySelector('#m-det .mft .bd').onclick = function() { delExp(); };
   openMod('m-det');
 }
 
@@ -2139,7 +2168,7 @@ let EG_MEMBERS = []; // {id, name, _editName, _remove}
 
 function openEditGroup(gid) {
   const g = DB.groups.find(x=>x.id===gid); if (!g) return;
-  EG_ICON = GICONS.indexOf(g.icon); if (EG_ICON<0) EG_ICON=0;
+  EG_ICON = GICONS.findIndex(x=>x.e===g.icon); if (EG_ICON<0) EG_ICON=0;
   // Deep copy members for editing
   EG_MEMBERS = g.members.map(m => ({...m, _editName: m.name, _remove: false}));
 
@@ -2154,8 +2183,9 @@ function openEditGroup(gid) {
 
 function _renderEGIcons() {
   const el = document.getElementById('eg-icons'); if (!el) return;
-  el.innerHTML = GICONS.map((e,i) =>
-    `<button class="catb ${i===EG_ICON?'sel':''}" onclick="EG_ICON=${i};_renderEGIcons()">${e}</button>`
+  el.innerHTML = GICONS.map((ic,i) =>
+    '<button class="catb ' + (i===EG_ICON?'sel':'') + '" onclick="EG_ICON='+i+';_renderEGIcons()">'
+    + ic.e + '<span>' + ic.l + '</span></button>'
   ).join('');
 }
 
@@ -2238,7 +2268,7 @@ function saveGroupEdit() {
 
   // Save group metadata
   g.name    = newName;
-  g.icon    = GICONS[EG_ICON];
+  g.icon    = GICONS[EG_ICON].e;
   g.cur     = document.getElementById('eg-cur').value;
   g.members = activeMembers.map(m => ({
     id:   m.id || uid(),
@@ -2306,8 +2336,9 @@ function _ngPrepare() {
   _renderNgIcons(); _renderNgMems();
 }
 function _renderNgIcons() {
-  document.getElementById('ng-icons').innerHTML = GICONS.map((e,i) =>
-    `<button class="catb ${i===NG_ICON?'sel':''}" onclick="NG_ICON=${i};_renderNgIcons()">${e}</button>`
+  document.getElementById('ng-icons').innerHTML = GICONS.map((ic,i) =>
+    '<button class="catb ' + (i===NG_ICON?'sel':'') + '" onclick="NG_ICON='+i+';_renderNgIcons()">'
+    + ic.e + '<span>' + ic.l + '</span></button>'
   ).join('');
 }
 function _renderNgMems() {
@@ -2323,7 +2354,7 @@ function ngAddM() {
 function createGroup() {
   const name=document.getElementById('ng-name').value.trim();
   if (!name) { toast('Enter a group name'); return; }
-  DB.groups.unshift({id:uid(),name,icon:GICONS[NG_ICON],cur:document.getElementById('ng-cur').value,members:NG_MEMS.map(m=>({id:uid(),name:m})),expenses:[],createdAt:new Date().toISOString()});
+  DB.groups.unshift({id:uid(),name,icon:GICONS[NG_ICON].e,cur:document.getElementById('ng-cur').value,members:NG_MEMS.map(m=>({id:uid(),name:m})),expenses:[],createdAt:new Date().toISOString()});
   saveDB(); closeMod('m-newg'); toast(`"${name}" created`); rGrpList();
 }
 
@@ -2438,7 +2469,10 @@ function openGEDet(id) {
       </div>
       ${e.notes?`<div class="dr"><div class="dlb">Notes</div><div class="dv">${esc(e.notes)}</div></div>`:''}
     </div>`;
-  document.getElementById('det-edit').onclick=()=>{closeMod('m-det');openAddGE(id);};
+  document.getElementById('det-edit').textContent = 'Edit';
+  document.getElementById('det-edit').onclick = function() { closeMod('m-det'); openAddGE(id); };
+  document.querySelector('#m-det .mft .bd').textContent = 'Delete';
+  document.querySelector('#m-det .mft .bd').onclick = function() { delExp(); };
   openMod('m-det');
 }
 
@@ -2447,21 +2481,52 @@ function delExp() {
   if (CGI) {
     const g   = getG();
     const exp = (g.expenses||[]).find(e=>e.id===CEI);
-    const label = `"${exp?.desc||'Expense'}" deleted`;
-    const snapshot = JSON.stringify(DB);          // snapshot BEFORE mutation
+    const label = '"' + (exp?.desc||'Expense') + '" deleted';
+    // snapshot before mutation
+    const snapshot = JSON.stringify(DB);
     g.expenses = (g.expenses||[]).filter(e=>e.id!==CEI);
     saveDB();
-    _showUndoToast(snapshot, label);
+    // show undo manually (saveWithUndo takes snapshot inside, so use manual approach)
+    _undoToast(snapshot, label, rGT);
     rGT();
   } else {
-    const exp = DB.personal.find(e=>e.id===CEI);
-    const label = `"${exp?.desc||'Expense'}" deleted`;
-    const snapshot = JSON.stringify(DB);          // snapshot BEFORE mutation
+    const exp   = DB.personal.find(e=>e.id===CEI);
+    const label = '"' + (exp?.desc||'Expense') + '" deleted';
+    const snapshot = JSON.stringify(DB);
     DB.personal = DB.personal.filter(e=>e.id!==CEI);
     saveDB();
-    _showUndoToast(snapshot, label);
+    _undoToast(snapshot, label, () => {
+      if (CV==='personal') rPersonal(); else rDash();
+    });
     if (CV==='personal') rPersonal(); else rDash();
   }
+}
+
+// Shared undo toast helper — takes a pre-made snapshot
+function _undoToast(snapshot, label, afterFn) {
+  if (UNDO_STACK) { clearTimeout(UNDO_STACK.timer); UNDO_STACK.el?.remove(); }
+  const container = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast-undo';
+  el.innerHTML = '<span>' + esc(label) + '</span><button onclick="_doUndoManual()">Undo</button>';
+  container.appendChild(el);
+  const timer = setTimeout(() => { el.remove(); UNDO_STACK = null; }, 5000);
+  UNDO_STACK = { snapshot, label, timer, el, afterFn };
+}
+
+function _doUndoManual() {
+  if (!UNDO_STACK) return;
+  clearTimeout(UNDO_STACK.timer);
+  UNDO_STACK.el?.remove();
+  const fn = UNDO_STACK.afterFn;
+  DB = JSON.parse(UNDO_STACK.snapshot);
+  saveDB();
+  UNDO_STACK = null;
+  toast('Undone \u2713');
+  if (fn) fn();
+  else if (CV==='personal') { buildMonthFilter(); rPersonal(); }
+  else if (CV==='groups') rGroups();
+  else rDash();
 }
 function delGrp(id){
   if(!confirm('Delete this group and all its data?'))return;
@@ -2633,7 +2698,13 @@ function clearAll(){
 // ═══════════════════════════════════════════════
 // MAINTENANCE TRACKER
 // ═══════════════════════════════════════════════
-const MAINT_ICONS = ['🚗','🏍️','🚲','❄️','🔧','🏠','💧','⚡','🔥','🌿','🖥️','📱','🛁','🔋','🎛️','🧯'];
+const MAINT_ICONS = [
+  {e:'🚗', l:'Car'},     {e:'🏍️', l:'Bike'},   {e:'🚲', l:'Cycle'},
+  {e:'❄️', l:'AC'},      {e:'🔧', l:'General'}, {e:'🏠', l:'Home'},
+  {e:'💧', l:'Plumbing'},{e:'⚡', l:'Electric'}, {e:'🔥', l:'Boiler'},
+  {e:'🌿', l:'Garden'},  {e:'🖥️', l:'PC'},      {e:'📱', l:'Phone'},
+  {e:'🛁', l:'Bathroom'},{e:'🔋', l:'Battery'},  {e:'🎛️', l:'Appliance'},{e:'🧯', l:'Safety'},
+];
 let MAINT_ICON_IDX = 0;
 let MAINT_EID      = null;
 let MAINT_LOG_ID   = null;
@@ -2715,72 +2786,91 @@ function rMaintain() {
 }
 
 function _maintCard(item, cur) {
-  const st      = maintStatus(item);
-  const due     = maintDueDate(item);
-  const dl      = maintDaysUntil(item);
-  const hist    = item.history||[];
-  const lastCost= hist.length ? hist[hist.length-1].cost : (item.lastCost||0);
-  const total   = totalMaintCost(item);
-  const isOver  = dl!==null&&dl<0;
-  const isSoon  = dl!==null&&dl>=0&&dl<=7;
-  const borderCol = isOver?'#fcc':isSoon?'#fcd9a0':'var(--brd)';
-  const barCol    = isOver?'var(--red)':isSoon?'var(--amb)':'var(--grn)';
+  const st       = maintStatus(item);
+  const due      = maintDueDate(item);
+  const dl       = maintDaysUntil(item);
+  const hist     = item.history||[];
+  const lastCost = hist.length ? hist[hist.length-1].cost : (item.lastCost||0);
+  const total    = totalMaintCost(item);
+  const isOver   = dl!==null && dl<0;
+  const isSoon   = dl!==null && dl>=0 && dl<=7;
+  const borderCol = isOver ? '#fcc' : isSoon ? '#fcd9a0' : 'var(--brd)';
+  const barCol    = isOver ? 'var(--red)' : isSoon ? 'var(--amb)' : 'var(--grn)';
   let pct = 0;
-  if(item.lastDate && due) {
+  if (item.lastDate && due) {
     const last = new Date(item.lastDate+'T00:00:00');
     pct = Math.min(100, Math.max(0, ((new Date()-last)/(due-last))*100));
   }
-  return `<div style="background:var(--bg);border:1.5px solid ${borderCol};border-radius:var(--rl);overflow:hidden;">
-<div style="display:flex;align-items:flex-start;gap:12px;padding:14px 15px 10px;">
-      <div style="width:44px;height:44px;border-radius:10px;background:var(--bg3);display:grid;place-items:center;font-size:22px;flex-shrink:0;">${item.icon||'🔧'}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:15px;font-weight:800;letter-spacing:-.03em;">${esc(item.name)}</div>
-        ${item.asset?`<div style="font-size:11px;color:var(--ink3);font-family:var(--mono);margin-top:1px;">📌 ${esc(item.asset)}</div>`:''}
-        <div style="font-size:11px;color:var(--ink4);font-family:var(--mono);margin-top:2px;">🔄 Every ${item.interval} ${item.unit}</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0;padding-top:2px;">
-        <div style="font-size:12px;font-weight:700;color:${st.color};font-family:var(--mono);">${st.label}</div>
-        ${due?`<div style="font-size:10px;color:var(--ink4);font-family:var(--mono);margin-top:2px;">📅 ${fDate(due.toISOString().slice(0,10))}</div>`:''}
-      </div>
-    </div>
-${item.lastDate&&due?`<div style="padding:0 15px 12px;">
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink4);font-family:var(--mono);margin-bottom:5px;">
-        <span>Last service: ${fDate(item.lastDate)}</span>
-        <span>Next due: ${fDate(due.toISOString().slice(0,10))}</span>
-      </div>
-      <div style="height:7px;background:var(--bg3);border-radius:4px;overflow:hidden;">
-        <div style="height:100%;width:${pct.toFixed(1)}%;background:${barCol};border-radius:4px;transition:width .4s;"></div>
-      </div>
-      <div style="font-size:10px;color:var(--ink4);font-family:var(--mono);margin-top:4px;text-align:right;">${pct.toFixed(0)}% of interval elapsed</div>
-    </div>`:''}
-<div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--brd);">
-      <div style="padding:10px 12px;border-right:1px solid var(--brd);">
-        <div style="font-size:9px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Last Done</div>
-        <div style="font-size:12px;font-weight:700;margin-top:3px;font-family:var(--mono);">${item.lastDate?fDate(item.lastDate):'Never'}</div>
-      </div>
-      <div style="padding:10px 12px;border-right:1px solid var(--brd);">
-        <div style="font-size:9px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Last Cost</div>
-        <div style="font-size:12px;font-weight:700;margin-top:3px;font-family:var(--mono);">${lastCost?cur+fmt(lastCost):'–'}</div>
-      </div>
-      <div style="padding:10px 12px;">
-        <div style="font-size:9px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Total Spent</div>
-        <div style="font-size:12px;font-weight:700;margin-top:3px;font-family:var(--mono);">${total?cur+fmt(total):'–'}</div>
-      </div>
-    </div>
-<div style="display:flex;gap:8px;padding:10px 15px;border-top:1px solid var(--brd);background:var(--bg2);flex-wrap:wrap;">
-      <button class="btn bp bsm" style="flex:1;justify-content:center;min-width:100px;" onclick="openMaintLog('${item.id}')">✓ Mark as Done</button>
-      <button class="btn bg bsm" onclick="openAddMaint('${item.id}')">✏️ Edit</button>
-      ${hist.length?`<button class="btn bg bsm" onclick="openMaintHistory('${item.id}')">📋 History (${hist.length})</button>`:''}
-      <button class="btn bd bsm" onclick="deleteMaintItem('${item.id}')">🗑️ Delete</button>
-    </div>
-  </div>`;
+
+  // Progress bar section
+  const progressHtml = (item.lastDate && due)
+    ? '<div style="padding:0 15px 12px;">'
+        + '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink4);font-family:var(--mono);margin-bottom:5px;">'
+          + '<span>Last: ' + fDate(item.lastDate) + '</span>'
+          + '<span>Next: ' + fDate(due.toISOString().slice(0,10)) + '</span>'
+        + '</div>'
+        + '<div style="height:7px;background:var(--bg3);border-radius:4px;overflow:hidden;">'
+          + '<div style="height:100%;width:' + pct.toFixed(1) + '%;background:' + barCol + ';border-radius:4px;transition:width .4s;"></div>'
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--ink4);font-family:var(--mono);margin-top:4px;text-align:right;">' + pct.toFixed(0) + '% of interval elapsed</div>'
+      + '</div>'
+    : '';
+
+  // History button — only if there's history
+  const histBtn = hist.length
+    ? '<button class="btn bg bsm" onclick="openMaintHistory(\'' + item.id + '\')">📋 History (' + hist.length + ')</button>'
+    : '';
+
+  return '<div style="background:var(--bg);border:1.5px solid ' + borderCol + ';border-radius:var(--rl);overflow:hidden;">'
+
+    // Header
+    + '<div style="display:flex;align-items:flex-start;gap:12px;padding:14px 15px 10px;">'
+      + '<div style="width:44px;height:44px;border-radius:10px;background:var(--bg3);display:grid;place-items:center;font-size:22px;flex-shrink:0;">' + (item.icon||'🔧') + '</div>'
+      + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:15px;font-weight:800;letter-spacing:-.03em;">' + esc(item.name) + '</div>'
+        + (item.asset ? '<div style="font-size:11px;color:var(--ink3);font-family:var(--mono);margin-top:1px;">📌 Asset: ' + esc(item.asset) + '</div>' : '')
+        + '<div style="font-size:11px;color:var(--ink4);font-family:var(--mono);margin-top:2px;">🔄 Every ' + item.interval + ' ' + item.unit + '</div>'
+      + '</div>'
+      + '<div style="text-align:right;flex-shrink:0;padding-top:2px;">'
+        + '<div style="font-size:12px;font-weight:700;color:' + st.color + ';font-family:var(--mono);">' + st.label + '</div>'
+        + (due ? '<div style="font-size:10px;color:var(--ink4);font-family:var(--mono);margin-top:2px;">📅 Due ' + fDate(due.toISOString().slice(0,10)) + '</div>' : '')
+      + '</div>'
+    + '</div>'
+
+    // Progress bar
+    + progressHtml
+
+    // Stats row
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--brd);">'
+      + '<div style="padding:10px 12px;border-right:1px solid var(--brd);">'
+        + '<div style="font-size:9px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Last Done</div>'
+        + '<div style="font-size:12px;font-weight:700;margin-top:3px;font-family:var(--mono);">' + (item.lastDate ? fDate(item.lastDate) : 'Never') + '</div>'
+      + '</div>'
+      + '<div style="padding:10px 12px;border-right:1px solid var(--brd);">'
+        + '<div style="font-size:9px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Last Cost</div>'
+        + '<div style="font-size:12px;font-weight:700;margin-top:3px;font-family:var(--mono);">' + (lastCost ? cur+fmt(lastCost) : '–') + '</div>'
+      + '</div>'
+      + '<div style="padding:10px 12px;">'
+        + '<div style="font-size:9px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Total Spent</div>'
+        + '<div style="font-size:12px;font-weight:700;margin-top:3px;font-family:var(--mono);">' + (total ? cur+fmt(total) : '–') + '</div>'
+      + '</div>'
+    + '</div>'
+
+    // Action buttons
+    + '<div style="display:flex;gap:8px;padding:10px 15px;border-top:1px solid var(--brd);background:var(--bg2);flex-wrap:wrap;">'
+      + '<button class="btn bp bsm" style="flex:1;justify-content:center;min-width:100px;" onclick="openMaintLog(\'' + item.id + '\')">✓ Mark as Done</button>'
+      + '<button class="btn bg bsm" onclick="openAddMaint(\'' + item.id + '\')">✏️ Edit</button>'
+      + histBtn
+      + '<button class="btn bd bsm" onclick="deleteMaintItem(\'' + item.id + '\')">🗑️ Delete</button>'
+    + '</div>'
+  + '</div>';
 }
 
 function openAddMaint(editId) {
   MAINT_EID = editId||null; MAINT_ICON_IDX = 0;
   const item = editId?(DB.maintenance||[]).find(x=>x.id===editId):null;
   if(item) {
-    MAINT_ICON_IDX = Math.max(0, MAINT_ICONS.indexOf(item.icon));
+    MAINT_ICON_IDX = Math.max(0, MAINT_ICONS.findIndex(x=>x.e===item.icon));
     document.getElementById('maint-name').value     = item.name;
     document.getElementById('maint-asset').value    = item.asset||'';
     document.getElementById('maint-last').value     = item.lastDate||'';
@@ -2805,8 +2895,9 @@ function openAddMaint(editId) {
 
 function _renderMaintIcons() {
   const el = document.getElementById('maint-icons'); if(!el) return;
-  el.innerHTML = MAINT_ICONS.map((e,i)=>
-    `<button class="catb ${i===MAINT_ICON_IDX?'sel':''}" onclick="MAINT_ICON_IDX=${i};_renderMaintIcons()">${e}</button>`
+  el.innerHTML = MAINT_ICONS.map((ic,i) =>
+    '<button class="catb ' + (i===MAINT_ICON_IDX?'sel':'') + '" onclick="MAINT_ICON_IDX='+i+';_renderMaintIcons()">'
+    + ic.e + '<span>' + ic.l + '</span></button>'
   ).join('');
 }
 
@@ -2820,45 +2911,89 @@ function saveMaintItem() {
   const interval = parseInt(document.getElementById('maint-interval').value);
   const lastDate = document.getElementById('maint-last').value||'';
   const lastCost = parseFloat(document.getElementById('maint-cost').value)||0;
+  const asset    = document.getElementById('maint-asset').value.trim();
+  const km       = parseFloat(document.getElementById('maint-km').value)||0;
+  const notes    = document.getElementById('maint-notes').value.trim();
+
   if(!name)             { toast('Enter a name'); return; }
   if(!interval||interval<1) { toast('Enter reminder interval (e.g. 3 months)'); return; }
   if(!DB.maintenance)   DB.maintenance=[];
-  const existing = MAINT_EID ? (DB.maintenance.find(x=>x.id===MAINT_EID)||{}) : {};
 
-  // Seed history with the initial "last service" entry when creating a new item
-  // so that the cost counts in Total Spent from day one
+  const existing   = MAINT_EID ? (DB.maintenance.find(x=>x.id===MAINT_EID)||{}) : {};
+  const itemId     = MAINT_EID || uid();
+  const isNew      = !MAINT_EID;
+  const hadHistory = (existing.history||[]).length > 0;
+
+  // Seed history with the initial entry
   let history = existing.history ? [...existing.history] : [];
-  if(!MAINT_EID && lastDate && lastCost>0) {
-    // New item — create a seed history entry for the known last service
+  let addedExpenseId = null;
+
+  if (isNew && lastDate && lastCost > 0) {
+    // Brand new item — seed history AND add to personal expenses on the correct date
+    addedExpenseId = uid();
     history = [{
-      id: uid(), date: lastDate, cost: lastCost, km: parseFloat(document.getElementById('maint-km').value)||0,
-      notes: 'Initial entry (last known service)', loggedAt: new Date().toISOString()
+      id: uid(), date: lastDate, cost: lastCost, km,
+      notes: notes||('Initial: '+name), loggedAt: new Date().toISOString()
     }];
-  } else if(MAINT_EID && existing.history?.length===0 && lastDate && lastCost>0) {
-    // Editing an item that had no history — seed it now
+    // Add to personal expenses on the date it was done
+    DB.personal.unshift({
+      id:          addedExpenseId,
+      desc:        name + (asset ? ' — ' + asset : ''),
+      amount:      lastCost,
+      date:        lastDate,
+      cat:         CAT_MAINT,
+      lendTo:      '',
+      notes:       notes || ('Maintenance: ' + name),
+      maintItemId: itemId,
+      createdAt:   new Date().toISOString()
+    });
+
+  } else if (!isNew && !hadHistory && lastDate && lastCost > 0) {
+    // Editing item that had no history yet — seed it now
     history = [{
       id: uid(), date: lastDate, cost: lastCost, km: 0,
       notes: 'Initial entry', loggedAt: new Date().toISOString()
     }];
+    // Also add to personal expenses if not already there
+    const alreadyLinked = DB.personal.some(e => e.maintItemId === itemId);
+    if (!alreadyLinked) {
+      DB.personal.unshift({
+        id: uid(), desc: name + (asset?' — '+asset:''),
+        amount: lastCost, date: lastDate, cat: CAT_MAINT,
+        lendTo: '', notes: notes||('Maintenance: '+name),
+        maintItemId: itemId, createdAt: new Date().toISOString()
+      });
+    }
   }
 
   const obj = {
-    id:        MAINT_EID||uid(),
-    icon:      MAINT_ICONS[MAINT_ICON_IDX],
+    id:        itemId,
+    icon:      MAINT_ICONS[MAINT_ICON_IDX].e,
     name,
-    asset:     document.getElementById('maint-asset').value.trim(),
+    asset,
     lastDate,
     lastCost,
     interval,
     unit:      document.getElementById('maint-unit').value,
-    currentKm: parseFloat(document.getElementById('maint-km').value)||0,
-    notes:     document.getElementById('maint-notes').value.trim(),
+    currentKm: km,
+    notes,
     history,
-    createdAt: existing.createdAt||new Date().toISOString()
+    createdAt: existing.createdAt || new Date().toISOString()
   };
+
   if(MAINT_EID) { const idx=DB.maintenance.findIndex(x=>x.id===MAINT_EID); if(idx>=0)DB.maintenance[idx]=obj; }
   else DB.maintenance.unshift(obj);
-  saveDB(); closeMod('m-maint'); toast(MAINT_EID?'Updated ✓':'Added ✓'); rMaintain();
+
+  saveDB();
+  closeMod('m-maint');
+
+  // Confirm what happened
+  if (isNew && lastDate && lastCost > 0) {
+    toast(name + ' added · ' + DB.currency + fmt(lastCost) + ' logged to ' + lastDate.slice(0,7));
+  } else {
+    toast(MAINT_EID ? 'Updated ✓' : 'Added ✓');
+  }
+  rMaintain();
 }
 
 function deleteMaintItem(id) {
@@ -2906,11 +3041,14 @@ function saveMaintLog() {
   const addExpense = document.getElementById('mlog-add-expense').checked && cost>0;
   if(addExpense) {
     DB.personal.unshift({
-      id:uid(),
-      desc:`${item.name}${item.asset?' — '+item.asset:''}`,
-      amount:cost, date, cat:5, lendTo:'',
-      notes:notes||`Maintenance: ${item.name}`,
-      createdAt:new Date().toISOString()
+      id: uid(),
+      desc: item.name + (item.asset ? ' — ' + item.asset : ''),
+      amount: cost, date,
+      cat: CAT_MAINT,   // 🔧 Maintenance category, not Health
+      lendTo: '',
+      notes: notes || ('Maintenance: ' + item.name),
+      maintItemId: item.id,  // link back so deletion is safe
+      createdAt: new Date().toISOString()
     });
   }
   saveDB();
@@ -2928,39 +3066,56 @@ function openMaintHistory(id) {
   const item = (DB.maintenance||[]).find(x=>x.id===id); if(!item) return;
   const cur  = DB.currency;
   const hist = [...(item.history||[])].reverse();
-  document.getElementById('m-det-body').innerHTML = `
-    <div style="text-align:center;padding:12px 0 14px;">
-      <div style="font-size:34px;">${item.icon||'🔧'}</div>
-      <div style="font-size:17px;font-weight:800;letter-spacing:-.04em;margin-top:8px;">${esc(item.name)}</div>
-      <div style="font-size:11px;color:var(--ink4);font-family:var(--mono);margin-top:3px;">${esc(item.asset||'')} · Every ${item.interval} ${item.unit}</div>
-    </div>
-    ${hist.length ? `
-    <div class="slb" style="margin-bottom:8px;">Service History</div>
-    <div style="display:grid;gap:8px;">
-      ${hist.map((h,i)=>`
-      <div style="background:var(--bg2);border:1.5px solid var(--brd);border-radius:var(--rl);padding:12px 14px;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-          <div style="min-width:0;">
-            <div style="font-size:13px;font-weight:700;">${fDate(h.date)}</div>
-            ${h.km?`<div style="font-size:11px;color:var(--ink4);font-family:var(--mono);">${fmt(h.km)} km</div>`:''}
-            ${h.notes?`<div style="font-size:12px;color:var(--ink3);margin-top:3px;white-space:pre-wrap;">${esc(h.notes)}</div>`:''}
-          </div>
-          <div style="text-align:right;flex-shrink:0;">
-            <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:${h.cost?'var(--ink)':'var(--ink4)'};">${h.cost?cur+fmt(h.cost):'Free'}</div>
-            ${i===0?'<div style="font-size:10px;color:var(--grn);font-family:var(--mono);font-weight:700;">Latest</div>':''}
-          </div>
-        </div>
-      </div>`).join('')}
-    </div>
-    <div style="margin-top:12px;padding:11px 14px;background:var(--bg2);border:1.5px solid var(--brd);border-radius:var(--rl);display:flex;justify-content:space-between;align-items:center;">
-      <span style="font-size:12px;font-weight:700;">Total spent on ${esc(item.name)}</span>
-      <span style="font-family:var(--mono);font-size:14px;font-weight:700;">${cur}${fmt(totalMaintCost(item))}</span>
-    </div>` :
-    '<div style="text-align:center;padding:24px;color:var(--ink4);font-size:13px;">No history yet.<br>Tap "Mark Done" after each service.</div>'}`;
-  document.getElementById('det-edit').textContent = 'Edit Item';
-  document.getElementById('det-edit').onclick = ()=>{ closeMod('m-det'); openAddMaint(id); };
-  document.querySelector('#m-det .mft .bd').onclick = ()=>{ closeMod('m-det'); deleteMaintItem(id); };
-  openMod('m-det');
+
+  document.getElementById('mhist-ttl').textContent = (item.icon||'🔧') + ' ' + item.name;
+
+  var bodyHtml = '<div style="text-align:center;padding:10px 0 14px;">'
+    + '<div style="font-size:36px;">' + (item.icon||'🔧') + '</div>'
+    + '<div style="font-size:17px;font-weight:800;letter-spacing:-.04em;margin-top:6px;">' + esc(item.name) + '</div>'
+    + (item.asset ? '<div style="font-size:11px;color:var(--ink4);font-family:var(--mono);margin-top:3px;">📌 ' + esc(item.asset) + '</div>' : '')
+    + '<div style="font-size:11px;color:var(--ink4);font-family:var(--mono);margin-top:2px;">🔄 Every ' + item.interval + ' ' + item.unit + '</div>'
+  + '</div>';
+
+  if (hist.length) {
+    bodyHtml += '<div class="slb" style="margin-bottom:8px;">Service History (' + hist.length + ')</div>'
+      + '<div style="display:grid;gap:8px;">';
+    hist.forEach(function(h, i) {
+      bodyHtml += '<div style="background:var(--bg2);border:1.5px solid var(--brd);border-radius:var(--rl);padding:12px 14px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
+          + '<div style="min-width:0;">'
+            + '<div style="font-size:13px;font-weight:700;">' + fDate(h.date) + '</div>'
+            + (h.km ? '<div style="font-size:11px;color:var(--ink4);font-family:var(--mono);">' + fmt(h.km) + ' km</div>' : '')
+            + (h.notes ? '<div style="font-size:12px;color:var(--ink3);margin-top:3px;">' + esc(h.notes) + '</div>' : '')
+          + '</div>'
+          + '<div style="text-align:right;flex-shrink:0;">'
+            + '<div style="font-family:var(--mono);font-size:14px;font-weight:700;color:' + (h.cost?'var(--ink)':'var(--ink4)') + ';">' + (h.cost ? cur+fmt(h.cost) : 'Free') + '</div>'
+            + (i===0 ? '<div style="font-size:10px;color:var(--grn);font-family:var(--mono);font-weight:700;">Latest</div>' : '')
+          + '</div>'
+        + '</div>'
+      + '</div>';
+    });
+    bodyHtml += '</div>'
+      + '<div style="margin-top:12px;padding:11px 14px;background:var(--bg2);border:1.5px solid var(--brd);border-radius:var(--rl);display:flex;justify-content:space-between;align-items:center;">'
+        + '<span style="font-size:12px;font-weight:700;">Total spent on ' + esc(item.name) + '</span>'
+        + '<span style="font-family:var(--mono);font-size:14px;font-weight:700;">' + cur + fmt(totalMaintCost(item)) + '</span>'
+      + '</div>';
+  } else {
+    bodyHtml += '<div style="text-align:center;padding:24px;color:var(--ink4);font-size:13px;">No history yet.<br>Tap "Mark Done" after each service.</div>';
+  }
+
+  document.getElementById('mhist-body').innerHTML = bodyHtml;
+
+  // Wire buttons on the DEDICATED modal — never touches m-det
+  document.getElementById('mhist-edit').onclick = function() {
+    closeMod('m-maint-hist');
+    openAddMaint(id);
+  };
+  document.getElementById('mhist-del').onclick = function() {
+    closeMod('m-maint-hist');
+    deleteMaintItem(id);
+  };
+
+  openMod('m-maint-hist');
 }
 
 
