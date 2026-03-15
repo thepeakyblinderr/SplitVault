@@ -1,7 +1,7 @@
 {
-  "name": "SplitVault",
-  "short_name": "SplitVault",
-  "description": "Local-first expense splitting & personal finance tracker",
+  "name": "MoneyMate",
+  "short_name": "MoneyMate",
+  "description": "Local-first expense splitting, maintenance tracker & personal finance",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
