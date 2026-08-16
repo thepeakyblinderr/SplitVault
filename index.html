@@ -255,7 +255,7 @@ body{
 /* ── SEARCH OVERLAY ── */
 .srch-ovr{display:none;position:fixed;inset:0;z-index:300;background:rgba(10,10,10,.48);backdrop-filter:blur(4px);flex-direction:column}
 .srch-ovr.open{display:flex}
-.srch-bar{background:var(--bg);border-bottom:1.5px solid var(--brd);padding:12px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.srch-bar{background:var(--bg);border-bottom:1.5px solid var(--brd);padding:calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;display:flex;align-items:center;gap:10px;flex-shrink:0}
 .srch-inp{flex:1;border:none;outline:none;font-family:var(--sans);font-size:16px;font-weight:600;color:var(--ink);background:transparent;letter-spacing:-.02em}
 .srch-inp::placeholder{color:var(--ink4)}
 .srch-body{flex:1;overflow-y:auto;background:var(--bg);padding:8px 0 80px}
