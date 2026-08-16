@@ -2384,9 +2384,33 @@ function impJSON(ev){
   const r=new FileReader();
   r.onload=e=>{
     try{
-      const d=JSON.parse(e.target.result);
-      if(d.personal){const ids=new Set(DB.personal.map(x=>x.id));d.personal.forEach(x=>{if(!ids.has(x.id))DB.personal.push(x);});}
-      if(d.groups){const ids=new Set(DB.groups.map(x=>x.id));d.groups.forEach(g=>{if(!ids.has(g.id))DB.groups.push(g);});}
+      let d = JSON.parse(e.target.result);
+      // Some backup tools snapshot raw localStorage instead of using our
+      // own Export JSON, wrapping the actual payload in an envelope like
+      // {version, exported, apps: {<name>: {key, data}}} or {data: {...}}.
+      // Unwrap so those imports work the same as our own export.
+      if (d && !Array.isArray(d.personal)) {
+        const found = (d.apps && Object.values(d.apps).find(a => a && a.data && Array.isArray(a.data.personal)))
+          || (d.data && Array.isArray(d.data.personal) ? d : null);
+        if (found) d = found.data || found;
+      }
+      if (!d || !Array.isArray(d.personal)) {
+        toast('Invalid file — must be a MoneyMate JSON');
+        ev.target.value=''; return;
+      }
+
+      const mergeById = key => {
+        if (!Array.isArray(d[key])) return;
+        if (!Array.isArray(DB[key])) DB[key] = [];
+        const ids = new Set(DB[key].map(x=>x.id));
+        d[key].forEach(x => { if (!ids.has(x.id)) DB[key].push(x); });
+      };
+      mergeById('personal');
+      mergeById('groups');
+      mergeById('lendHistory');
+      mergeById('oweHistory');
+      mergeById('recurring');
+      mergeById('maintenance');
       if(d.currency)DB.currency=d.currency;
       if(d.budget)DB.budget=d.budget;
       saveDB(); closeMod('m-bkp'); toast('Import successful'); showView(CV);
