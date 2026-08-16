@@ -38,18 +38,18 @@
 }
 @media (prefers-color-scheme: dark){
   :root{
-    --bg:#161513;--bg2:#1c1b18;--bg3:#242320;--bg4:#302f29;
-    --brd:#2b2a26;--brd2:#3a3934;
-    --ink:#f2f0ec;--ink2:#d8d5cc;--ink3:#9c998e;--ink4:#6f6c62;
-    --red:#d17a6e;--rbg:#2b1c1a;
-    --grn:#5fac82;--gbg:#182821;
-    --amb:#d1a35c;--abg:#2b2317;
-    --accent1:#8a97a6;--accent2:#a698b0;
+    --bg:#000000;--bg2:#0d0d0d;--bg3:#1c1c1e;--bg4:#2c2c2e;
+    --brd:#1c1c1e;--brd2:#3a3a3c;
+    --ink:#ffffff;--ink2:#e5e5e7;--ink3:#8e8e93;--ink4:#636366;
+    --red:#ff453a;--rbg:#2c1210;
+    --grn:#32d74b;--gbg:#0d2415;
+    --amb:#ffb340;--abg:#2b1f0d;
+    --accent1:#5e9eff;--accent2:#bf5af2;
     --amb-ink:#1a1408;
-    --bg-t:rgba(22,21,19,.86);
-    --sh:0 1px 2px rgba(0,0,0,.2);
-    --shlg:0 4px 20px rgba(0,0,0,.4);
-    --shxl:0 16px 44px rgba(0,0,0,.5);
+    --bg-t:rgba(0,0,0,.85);
+    --sh:0 1px 2px rgba(0,0,0,.4);
+    --shlg:0 4px 20px rgba(0,0,0,.5);
+    --shxl:0 16px 44px rgba(0,0,0,.6);
   }
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -308,8 +308,15 @@ body{
 
 /* ── DIARY (Home) ── */
 .diary{display:flex;flex-direction:column}
+.diary.blank{min-height:calc(100dvh - var(--nh) - var(--th) - 200px)}
+.diary.blank .dg{display:flex;flex-direction:column;flex:1}
+.diary.blank #today-rows{flex:1;display:flex;flex-direction:column}
+.dg-blank{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px 30px;min-height:280px}
+.dg-blank-ei{font-size:34px;margin-bottom:10px;opacity:.7}
+.dg-blank-tt{font-size:16px;font-weight:700;color:var(--ink2);letter-spacing:-.02em}
+.dg-blank-sb{font-size:13px;color:var(--ink4);margin-top:5px}
 .dg{padding-bottom:4px}
-.dg + .dg{margin-top:26px;padding-top:22px;border-top:1px solid var(--brd)}
+.dg + .dg{margin-top:34px}
 .dg-hdr{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:2px}
 .dg-t{font-size:25px;font-weight:800;letter-spacing:-.03em}
 .dg-s{font-size:11px;color:var(--ink4);font-family:var(--mono);margin-top:2px}
@@ -358,14 +365,13 @@ body{
 .drawer{
   position:fixed;top:0;bottom:0;left:0;width:78%;max-width:300px;background:var(--bg);z-index:401;
   transform:translateX(-100%);transition:transform .22s cubic-bezier(.2,.8,.3,1);
-  padding:calc(20px + env(safe-area-inset-top, 0px)) 14px 20px;
-  display:flex;flex-direction:column;gap:2px;box-shadow:var(--shxl);overflow-y:auto;
+  padding:calc(56px + env(safe-area-inset-top, 0px)) 12px 20px;
+  display:flex;flex-direction:column;gap:4px;overflow-y:auto;
 }
 .drawer.open{transform:translateX(0)}
-.drawer-item{display:flex;align-items:center;gap:12px;padding:13px 12px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;color:var(--ink2);transition:background .12s}
-.drawer-item:hover{background:var(--bg3)}
-.drawer-item svg{width:17px;height:17px;color:var(--ink4);flex-shrink:0}
-.drawer-badge{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:600;color:var(--accent1)}
+.drawer-item{display:flex;align-items:center;gap:8px;padding:14px 16px;border-radius:16px;cursor:pointer;font-size:16px;font-weight:600;color:var(--ink);transition:background .12s;letter-spacing:-.01em}
+.drawer-item:hover,.drawer-item.active{background:var(--bg3)}
+.drawer-badge{margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink3)}
 
 .budget-bar{background:var(--bg2);border:none;border-radius:var(--rl);padding:15px;margin-bottom:18px}
 </style>
@@ -424,27 +430,21 @@ body{
 <div class="drawer-scrim" id="drawer-scrim" onclick="closeDrawer()"></div>
 <div class="drawer" id="drawer">
   <div class="drawer-item" onclick="openLendingOverview()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
     Lending<span class="drawer-badge" id="drawer-lend-badge" style="display:none"></span>
   </div>
   <div class="drawer-item" onclick="openRecurringOverview()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
     Recurring
   </div>
-  <div class="drawer-item" onclick="closeDrawer();openCfg()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-    Monthly budget
-  </div>
-  <div class="drawer-item" onclick="closeDrawer();showView('maintain')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+  <div class="drawer-item" id="drawer-item-maintain" onclick="closeDrawer();showView('maintain')">
     Maintenance
   </div>
+  <div class="drawer-item" onclick="closeDrawer();openCfg()">
+    Monthly budget
+  </div>
   <div class="drawer-item" onclick="closeDrawer();openMod('m-bkp')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
     Backup &amp; restore
   </div>
   <div class="drawer-item" onclick="closeDrawer();openCfg()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
     Settings
   </div>
 </div>
@@ -517,9 +517,9 @@ body{
 <div class="modal">
   <div class="mhd"><div class="mtl">Details</div><button class="mclose" onclick="closeMod('m-det')">×</button></div>
   <div class="mbd" id="m-det-body"></div>
-  <div class="mft mrow2" style="display:flex;gap:8px;">
-    <button class="btn bg" style="flex:1;justify-content:center" id="det-edit">Edit</button>
-    <button class="btn bd" style="flex:1;justify-content:center" onclick="delExp()">Delete</button>
+  <div class="mft" style="padding:0 12px 22px;display:flex;flex-direction:column;gap:2px;">
+    <div class="drawer-item" id="det-edit">Edit</div>
+    <div class="drawer-item" id="det-delete" style="color:var(--red)" onclick="delExp()">Delete</div>
   </div>
 </div>
 </div>
@@ -764,7 +764,7 @@ const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 // prefers-color-scheme on its own — these need to be picked in JS.
 const isDark = () => window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
 const PAL    = () => isDark()
-  ? ['#f2f0ec','#9c998e','#c9a173','#7fb89a','#c98a8a','#8a97a6','#a698b0','#c9985e','#a68ac9','#a6a67f']
+  ? ['#ffffff','#8e8e93','#c9a173','#7fb89a','#c98a8a','#5e9eff','#bf5af2','#c9985e','#a68ac9','#a6a67f']
   : ['#0a0a0a','#79776d','#8a7156','#5c7a68','#7a5c5c','#5c6b7a','#7a6b8a','#8a6d4f','#6b5c7a','#7a7a5c'];
 
 // ── STATE ────────────────────────────────────
@@ -1046,6 +1046,7 @@ function openDrawer() {
     if (totalLent > 0.5) { badge.textContent = DB.currency + fmt(totalLent); badge.style.display = ''; }
     else badge.style.display = 'none';
   }
+  document.getElementById('drawer-item-maintain')?.classList.toggle('active', CV === 'maintain');
   document.getElementById('drawer').classList.add('open');
   document.getElementById('drawer-scrim').classList.add('open');
 }
@@ -1407,6 +1408,11 @@ function rDash() {
   const visible  = allDates.slice(0, HOME_DAYS_SHOWN);
   const hasMore  = allDates.length > HOME_DAYS_SHOWN;
 
+  // Genuinely nothing ever logged (only the forced-empty "today" bucket
+  // exists) — a top-anchored one-liner leaves a dead void above the pinned
+  // composer, so center a proper empty state in the remaining space instead.
+  const isBlank = allDates.length === 1 && byDate[today].length === 0;
+
   const groupsHtml = visible.map(date => {
     const exps    = byDate[date];
     const isToday = date === today;
@@ -1423,15 +1429,19 @@ function rDash() {
 
     const rowsHtml = exps.map(e => {
       const isLend = e.cat === CAT_LEND;
-      return '<div class="dg-row" onclick="openPDet(\''+e.id+'\')">'
+      return '<div class="dg-row" data-id="'+e.id+'" onclick="openPDet(\''+e.id+'\')">'
         + '<div class="dg-desc">'+esc(e.desc)+(isLend&&e.lendTo?' <span style="color:var(--ink4);font-weight:500;">→ '+esc(e.lendTo)+'</span>':'')+'</div>'
         + '<div class="dg-amt" style="'+(isLend?'color:var(--amb)':'')+'">'+cur+fmt(e.amount)+'</div>'
       + '</div>';
     }).join('');
 
-    const bodyHtml = isToday
-      ? '<div id="today-rows">' + rowsHtml + (exps.length===0 ? '<div class="dg-empty" id="today-empty-hint">Nothing logged yet today.</div>' : '') + '</div>'
-      : rowsHtml;
+    const emptyHtml = exps.length===0
+      ? (isBlank
+          ? '<div class="dg-blank"><div class="dg-blank-ei">📓</div><div class="dg-blank-tt">Nothing logged yet</div><div class="dg-blank-sb">Type below to log your first expense.</div></div>'
+          : '<div class="dg-empty" id="today-empty-hint">Nothing logged yet today.</div>')
+      : '';
+
+    const bodyHtml = isToday ? '<div id="today-rows">' + rowsHtml + emptyHtml + '</div>' : rowsHtml;
 
     return '<div class="dg'+(isToday?'':' past')+'">'
       + '<div class="dg-hdr">'
@@ -1448,7 +1458,7 @@ function rDash() {
 
   document.getElementById('v-dash').innerHTML =
     '<div class="ctn fade" style="padding-bottom:96px">'
-    + '<div class="diary">' + groupsHtml + '</div>'
+    + '<div class="diary'+(isBlank?' blank':'')+'">' + groupsHtml + '</div>'
     + loadMoreHtml
     + '</div>';
 }
@@ -1470,6 +1480,59 @@ document.addEventListener('click', function(e) {
     openAddRecurring(editRow.dataset.rid);
   }
 });
+
+// ── SWIPE TO DELETE (diary rows) ──────────────
+(function() {
+  const THRESHOLD = 80;
+  let row = null, startX = 0, startY = 0, dx = 0, decided = false, horizontal = false, justSwiped = false;
+
+  document.addEventListener('pointerdown', e => {
+    const el = e.target.closest('.dg-row');
+    if (!el || !el.dataset.id) return;
+    row = el; startX = e.clientX; startY = e.clientY; dx = 0; decided = false; horizontal = false;
+    row.style.transition = 'none';
+  });
+
+  document.addEventListener('pointermove', e => {
+    if (!row) return;
+    const mx = e.clientX - startX, my = e.clientY - startY;
+    if (!decided) {
+      if (Math.abs(mx) < 6 && Math.abs(my) < 6) return;
+      decided = true;
+      horizontal = Math.abs(mx) > Math.abs(my);
+    }
+    if (!horizontal) return;
+    dx = Math.min(0, mx);
+    row.style.transform = 'translateX(' + dx + 'px)';
+    row.style.opacity = String(Math.max(.25, 1 + dx / 220));
+  });
+
+  function endSwipe() {
+    if (!row) return;
+    const el = row, id = row.dataset.id, deleting = horizontal && dx < -THRESHOLD;
+    row = null;
+    el.style.transition = 'transform .18s ease, opacity .18s ease';
+    if (deleting) {
+      justSwiped = true;
+      setTimeout(() => { justSwiped = false; }, 300);
+      el.style.transform = 'translateX(-100%)';
+      el.style.opacity = '0';
+      setTimeout(() => deletePersonalExpense(id), 160);
+    } else {
+      el.style.transform = '';
+      el.style.opacity = '';
+    }
+    decided = false; horizontal = false;
+  }
+  document.addEventListener('pointerup', endSwipe);
+  document.addEventListener('pointercancel', endSwipe);
+
+  // Suppress the click a swipe-delete would otherwise trigger (opening
+  // the detail modal on a row that's mid-delete).
+  document.addEventListener('click', e => {
+    if (justSwiped && e.target.closest('.dg-row')) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+})();
 
 // ── LENDING / RECURRING OVERVIEWS (opened from the ☰ menu) ──
 function _lendOutstanding() {
@@ -1733,11 +1796,7 @@ function openPDet(id) {
     + (isMaint && !maintItem ? '<div class="dr"><div class="dlb">Note</div><div class="dv" style="color:var(--ink4);font-size:12px;">Maintenance item was deleted</div></div>' : '')
     + '</div>';
 
-  // ALWAYS reset both buttons to their correct handlers for personal expenses
-  document.getElementById('det-edit').textContent = 'Edit';
   document.getElementById('det-edit').onclick = function() { closeMod('m-det'); openAddP(id); };
-  document.querySelector('#m-det .mft .bd').textContent = 'Delete';
-  document.querySelector('#m-det .mft .bd').onclick = function() { delExp(); };
   openMod('m-det');
 }
 
@@ -1807,10 +1866,14 @@ function savePersonal() {
 
 function delExp() {
   closeMod('m-det');
-  const exp   = DB.personal.find(e=>e.id===CEI);
+  deletePersonalExpense(CEI);
+}
+
+function deletePersonalExpense(id) {
+  const exp   = DB.personal.find(e=>e.id===id);
   const label = '"' + (exp?.desc||'Expense') + '" deleted';
   const snapshot = JSON.stringify(DB);
-  DB.personal = DB.personal.filter(e=>e.id!==CEI);
+  DB.personal = DB.personal.filter(e=>e.id!==id);
   saveDB();
   _undoToast(snapshot, label, rDash);
   if (CV==='dash') rDash();
@@ -1889,9 +1952,9 @@ function rAnalytics() {
     ${_heatmap(yr,exps,cur)}
   </div>`;
 
-  const ink  = isDark() ? '#f2f0ec' : '#0a0a0a';
-  const dash = isDark() ? '#3a3934' : '#c8c8be';
-  const inkFill = isDark() ? 'rgba(242,240,236,.08)' : 'rgba(10,10,10,.05)';
+  const ink  = isDark() ? '#ffffff' : '#0a0a0a';
+  const dash = isDark() ? '#3a3a3c' : '#c8c8be';
+  const inkFill = isDark() ? 'rgba(255,255,255,.08)' : 'rgba(10,10,10,.05)';
 
   dChart('c-an-bar');
   CI['c-an-bar']=new Chart(document.getElementById('c-an-bar'),{type:'bar',data:{labels:MONTHS,datasets:[{label:'Expenses',data:mly,backgroundColor:ink,borderRadius:4,borderSkipped:false}]},options:cOpts()});
@@ -1907,7 +1970,7 @@ function _heatmap(yr,exps,cur) {
   const mly=Array(12).fill(0);
   exps.forEach(e=>mly[parseInt(e.date.split('-')[1])-1]+= +e.amount);
   const mx=Math.max(...mly,1);
-  const base = isDark() ? '242,240,236' : '10,10,10';
+  const base = isDark() ? '255,255,255' : '10,10,10';
   const hot  = isDark() ? 'var(--bg)' : '#fff';
   return`<div class="sec"><div class="slb">Monthly Heatmap</div>
     <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:5px;">
@@ -1920,8 +1983,8 @@ function _heatmap(yr,exps,cur) {
 // CHARTS
 // ═══════════════════════════════════════════════
 function cOpts(extra={},legend=false){
-  const tick = isDark() ? '#6f6c62' : '#a9a79b';
-  const grid = isDark() ? '#242320' : '#f2f1ed';
+  const tick = isDark() ? '#636366' : '#a9a79b';
+  const grid = isDark() ? '#1c1c1e' : '#f2f1ed';
   return{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:legend,position:'bottom',labels:{font:{family:"'DM Mono'",size:10},padding:12,boxWidth:10}},tooltip:{bodyFont:{family:"'DM Mono'"},titleFont:{family:"'Syne'"}}},scales:{x:{grid:{display:false},ticks:{font:{family:"'DM Mono'",size:10},color:tick},border:{display:false}},y:{grid:{color:grid},ticks:{font:{family:"'DM Mono'",size:10},color:tick},border:{display:false},...(extra.y||{})}}};
 }
 function dChart(id){if(CI[id]){CI[id].destroy();delete CI[id];}}
