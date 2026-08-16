@@ -15,8 +15,6 @@
 <link rel="manifest" href="manifest.json">
 <title>MoneyMate</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#fff;--bg2:#faf9f7;--bg3:#f2f1ed;--bg4:#e8e6e0;
@@ -29,8 +27,8 @@
   --amb-ink:#fff;
   --bg-t:rgba(255,255,255,.92);
   --r:10px;--rl:16px;--rxl:24px;
-  --sans:'Syne',system-ui,sans-serif;
-  --mono:'DM Mono',monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --mono:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
   --sh:0 1px 2px rgba(0,0,0,.03);
   --shlg:0 4px 20px rgba(0,0,0,.06);
   --shxl:0 16px 44px rgba(0,0,0,.10);
@@ -374,8 +372,8 @@ body{
 .drawer-scrim{display:none;position:fixed;inset:0;z-index:400;background:rgba(10,10,10,.35);backdrop-filter:blur(2px)}
 .drawer-scrim.open{display:block}
 .drawer{
-  position:fixed;top:0;bottom:0;left:0;width:78%;max-width:300px;background:var(--bg);z-index:401;
-  transform:translateX(-100%);transition:transform .22s cubic-bezier(.2,.8,.3,1);
+  position:fixed;top:0;bottom:0;right:0;width:78%;max-width:300px;background:var(--bg);z-index:401;
+  transform:translateX(100%);transition:transform .22s cubic-bezier(.2,.8,.3,1);
   padding:calc(56px + env(safe-area-inset-top, 0px)) 12px 20px;
   display:flex;flex-direction:column;gap:4px;overflow-y:auto;
 }
@@ -803,14 +801,15 @@ function loadDB() {
       if (!d.lendHistory)  d.lendHistory  = [];
       if (!d.recurring)    d.recurring    = [];
       if (!d.maintenance)  d.maintenance  = [];
+      if (d.aiApiKey == null) d.aiApiKey = '';
       return d;
     }
   } catch(_){}
   try {
     const old = localStorage.getItem('sv3');
-    if (old) { const d=JSON.parse(old); d.version=4; d.lendHistory=[]; d.recurring=[]; d.maintenance=[]; return d; }
+    if (old) { const d=JSON.parse(old); d.version=4; d.lendHistory=[]; d.recurring=[]; d.maintenance=[]; d.aiApiKey=''; return d; }
   } catch(_){}
-  return {user:'You',groups:[],personal:[],currency:'₹',budget:0,lendHistory:[],recurring:[],maintenance:[],version:4};
+  return {user:'You',groups:[],personal:[],currency:'₹',budget:0,lendHistory:[],recurring:[],maintenance:[],aiApiKey:'',version:4};
 }
 function saveDB() { localStorage.setItem(KEY, JSON.stringify(DB)); }
 
@@ -850,9 +849,9 @@ let UNDO_STACK = null; // { snapshot: DB_JSON, label: string, timer: id, afterFn
 const QA_ICON_ARROW  = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
 const QA_ICON_SPIN   = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-9-9" opacity=".9"/></svg>';
 
-// Kept in memory only — never written to DB/localStorage. Gone on reload;
-// never sent anywhere except the Authorization header of a request the
-// user's own key pays for.
+// Persisted in DB (localStorage) like the rest of Settings — never sent
+// anywhere except the Authorization header of a request the user's own
+// key pays for.
 let aiApiKey   = '';
 let aiInFlight = false;
 
@@ -871,6 +870,7 @@ const AI_CAT_TO_IDX = { food:0, transport:1, entertainment:4, shopping:3, bills:
 
 function onAiKeyInput() {
   aiApiKey = document.getElementById('cfg-aikey').value.trim();
+  DB.aiApiKey = aiApiKey; saveDB();
   hideAiErr();
 }
 function toggleAiKeyVisibility() {
@@ -899,6 +899,12 @@ function hideAiErr() {
 }
 function setAiBadge(on) {
   document.getElementById('qa-badge')?.classList.toggle('show', !!on);
+}
+function _clearAiKey() {
+  aiApiKey = '';
+  DB.aiApiKey = '';
+  saveDB();
+  const inp = document.getElementById('cfg-aikey'); if (inp) inp.value = '';
 }
 
 // Gated fetch to the AICredits proxy: no key -> null (caller falls back to
@@ -934,12 +940,10 @@ async function parseExpense(text) {
       const lower = (apiMsg || '').toLowerCase();
       if (res.status === 401 || /\bauth\b|\bkey\b/.test(lower)) {
         showAiErr('BAD KEY');
-        aiApiKey = '';
-        const inp = document.getElementById('cfg-aikey'); if (inp) inp.value = '';
+        _clearAiKey();
       } else if (res.status === 402 || /credit|balance/.test(lower)) {
         showAiErr('NO CREDITS');
-        aiApiKey = '';
-        const inp = document.getElementById('cfg-aikey'); if (inp) inp.value = '';
+        _clearAiKey();
       } else if (res.status === 429) {
         showAiErr('RATE LIMITED — TRY AGAIN');
       } else {
@@ -2022,10 +2026,11 @@ function _heatmap(yr,exps,cur) {
 // ═══════════════════════════════════════════════
 // CHARTS
 // ═══════════════════════════════════════════════
+const CHART_FONT = '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
 function cOpts(extra={},legend=false){
   const tick = isDark() ? '#636366' : '#a9a79b';
   const grid = isDark() ? '#1c1c1e' : '#f2f1ed';
-  return{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:legend,position:'bottom',labels:{font:{family:"'DM Mono'",size:10},padding:12,boxWidth:10}},tooltip:{bodyFont:{family:"'DM Mono'"},titleFont:{family:"'Syne'"}}},scales:{x:{grid:{display:false},ticks:{font:{family:"'DM Mono'",size:10},color:tick},border:{display:false}},y:{grid:{color:grid},ticks:{font:{family:"'DM Mono'",size:10},color:tick},border:{display:false},...(extra.y||{})}}};
+  return{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:legend,position:'bottom',labels:{font:{family:CHART_FONT,size:10},padding:12,boxWidth:10}},tooltip:{bodyFont:{family:CHART_FONT},titleFont:{family:CHART_FONT}}},scales:{x:{grid:{display:false},ticks:{font:{family:CHART_FONT,size:10},color:tick},border:{display:false}},y:{grid:{color:grid},ticks:{font:{family:CHART_FONT,size:10},color:tick},border:{display:false},...(extra.y||{})}}};
 }
 function dChart(id){if(CI[id]){CI[id].destroy();delete CI[id];}}
 
@@ -2046,6 +2051,7 @@ function saveSettings(){
   DB.currency   = document.getElementById('cfg-cur').value;
   DB.budget     = parseFloat(document.getElementById('cfg-budget').value)||0;
   aiApiKey      = document.getElementById('cfg-aikey').value.trim();
+  DB.aiApiKey   = aiApiKey;
   saveDB(); closeMod('m-cfg'); toast('Settings saved'); showView(CV);
 }
 
@@ -2515,6 +2521,7 @@ function openMaintHistory(id) {
 // ═══════════════════════════════════════════════
 function init() {
   DB = loadDB();
+  aiApiKey = DB.aiApiKey || '';
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
   showView('dash');
 }
