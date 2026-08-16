@@ -336,6 +336,17 @@ body{
 .sumcs{font-size:10px;color:var(--ink4);font-family:var(--mono);margin-top:2px}
 .fade{animation:fadeIn .2s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── QUICK ADD ── */
+.qa{display:flex;align-items:center;gap:8px;background:var(--bg2);border-radius:999px;padding:5px 5px 5px 18px;margin-bottom:28px;transition:box-shadow .15s}
+.qa:focus-within{box-shadow:0 0 0 3px rgba(10,10,10,.06)}
+.qa-inp{flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:var(--sans);font-size:15px;color:var(--ink);letter-spacing:-.01em}
+.qa-inp::placeholder{color:var(--ink4)}
+.qa-btn{width:34px;height:34px;border-radius:50%;background:var(--ink);color:#fff;border:none;cursor:pointer;display:grid;place-items:center;flex-shrink:0;transition:opacity .12s,transform .12s}
+.qa-btn:hover{opacity:.85}
+.qa-btn:disabled{opacity:.4;cursor:default}
+.qa-btn.busy svg{animation:qaSpin .8s linear infinite}
+@keyframes qaSpin{to{transform:rotate(360deg)}}
 .budget-bar{background:var(--bg2);border:none;border-radius:var(--rl);padding:15px;margin-bottom:18px}
 </style>
 </head>
@@ -576,6 +587,11 @@ body{
       <div class="fg">
         <label class="fl">Monthly Budget (0 = disabled)</label>
         <div class="fiw"><div class="fip" id="cfg-pfx">₹</div><input type="number" class="fi" id="cfg-budget" placeholder="e.g. 20000" min="0" step="100"></div>
+      </div>
+      <div class="fg">
+        <label class="fl">Gemini API Key</label>
+        <input type="password" class="fi" id="cfg-gkey" placeholder="Paste your Gemini API key" autocomplete="off">
+        <div style="font-size:11px;color:var(--ink4);margin-top:2px;">Powers the quick-add box on Home — type "burger 200" and it logs itself. Get a free key at Google AI Studio. Stored only on this device, sent directly to Google when you use quick-add.</div>
       </div>
     </div>
   </div>
@@ -825,14 +841,15 @@ function loadDB() {
       if (!d.lendHistory)  d.lendHistory  = [];
       if (!d.recurring)    d.recurring    = [];
       if (!d.maintenance)  d.maintenance  = [];
+      if (d.geminiKey == null) d.geminiKey = '';
       return d;
     }
   } catch(_){}
   try {
     const old = localStorage.getItem('sv3');
-    if (old) { const d=JSON.parse(old); d.version=4; d.lendHistory=[]; d.recurring=[]; d.maintenance=[]; return d; }
+    if (old) { const d=JSON.parse(old); d.version=4; d.lendHistory=[]; d.recurring=[]; d.maintenance=[]; d.geminiKey=''; return d; }
   } catch(_){}
-  return {user:'You',groups:[],personal:[],currency:'₹',budget:0,lendHistory:[],recurring:[],maintenance:[],version:4};
+  return {user:'You',groups:[],personal:[],currency:'₹',budget:0,lendHistory:[],recurring:[],maintenance:[],geminiKey:'',version:4};
 }
 function saveDB() { localStorage.setItem(KEY, JSON.stringify(DB)); }
 
@@ -864,43 +881,124 @@ function toast(msg) {
 }
 
 // ── UNDO SYSTEM ──────────────────────────────
-let UNDO_STACK = null; // { snapshot: DB_JSON, label: string, timer: id }
+// Undo toast helper — takes a snapshot the caller made BEFORE mutating DB.
+// (See _undoToast/_doUndoManual below, shared by every delete/auto-log action.)
+let UNDO_STACK = null; // { snapshot: DB_JSON, label: string, timer: id, afterFn }
 
-function saveWithUndo(label, afterFn) {
-  // Save a snapshot BEFORE the destructive action
-  const snapshot = JSON.stringify(DB);
-  // Now commit the change (caller already mutated DB)
-  saveDB();
-  // Clear previous undo if any
-  if (UNDO_STACK) {
-    clearTimeout(UNDO_STACK.timer);
-    UNDO_STACK.el?.remove();
+// ── QUICK ADD (Gemini) ───────────────────────
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const QA_ICON_ARROW  = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
+const QA_ICON_SPIN   = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-9-9" opacity=".9"/></svg>';
+
+async function submitQuickAdd() {
+  const inp = document.getElementById('qa-inp');
+  const btn = document.getElementById('qa-btn');
+  if (!inp || !btn) return;
+  const text = inp.value.trim();
+  if (!text) return;
+
+  if (!DB.geminiKey) {
+    toast('Add a Gemini API key in Settings first');
+    openCfg();
+    return;
   }
-  // Show undo toast
-  const container = document.getElementById('toasts');
-  const el = document.createElement('div');
-  el.className = 'toast-undo';
-  el.innerHTML = `<span>${esc(label)}</span><button onclick="doUndo()">Undo</button>`;
-  container.appendChild(el);
-  const timer = setTimeout(() => {
-    el.remove();
-    UNDO_STACK = null;
-  }, 5000);
-  UNDO_STACK = { snapshot, label, timer, el, afterFn };
+
+  inp.disabled = true; btn.disabled = true;
+  btn.classList.add('busy'); btn.innerHTML = QA_ICON_SPIN;
+
+  try {
+    const parsed = await geminiParseExpense(text);
+    logQuickExpense(parsed, text);
+    inp.value = '';
+  } catch (err) {
+    console.error('Quick-add parse failed:', err);
+    toast('Could not parse that — try rephrasing, or add it manually');
+  } finally {
+    inp.disabled = false; btn.disabled = false;
+    btn.classList.remove('busy'); btn.innerHTML = QA_ICON_ARROW;
+    inp.focus();
+  }
 }
 
-function doUndo() {
-  if (!UNDO_STACK) return;
-  clearTimeout(UNDO_STACK.timer);
-  UNDO_STACK.el?.remove();
-  DB = JSON.parse(UNDO_STACK.snapshot);
+async function geminiParseExpense(text) {
+  const catLabels = CATS.map(c => c.l);
+  const schema = {
+    type: 'OBJECT',
+    properties: {
+      amount:      { type: 'NUMBER',  description: 'Numeric amount only, no currency symbol.' },
+      description: { type: 'STRING',  description: 'Short 2-4 word label for what it was, e.g. "Burger".' },
+      category:    { type: 'STRING',  enum: catLabels },
+      date:        { type: 'STRING',  description: 'Resolved date in YYYY-MM-DD format.' },
+      lendTo:      { type: 'STRING',  description: 'Person’s name if money was lent out, else empty string.' }
+    },
+    required: ['amount', 'description', 'category', 'date']
+  };
+  const prompt =
+    'You are an expense-logging assistant for a personal finance app. ' +
+    'Today’s date is ' + tday() + ' (YYYY-MM-DD). ' +
+    'Parse the following into a single expense entry: "' + text.replace(/"/g, '\\"') + '"\n' +
+    'Resolve any relative date words ("today", "yesterday", a weekday, etc.) against today’s date. ' +
+    'If no date is mentioned, use today. Pick exactly one category from the allowed list that best fits. ' +
+    'Return only the JSON object.';
+
+  const res = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(DB.geminiKey),
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json', responseSchema: schema }
+      })
+    }
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error('Gemini request failed (' + res.status + '): ' + body.slice(0, 200));
+  }
+  const data = await res.json();
+  const raw  = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) throw new Error('Empty response from Gemini');
+  const obj = JSON.parse(raw);
+  if (!obj.amount || +obj.amount <= 0) throw new Error('No valid amount parsed');
+  return obj;
+}
+
+function logQuickExpense(parsed, originalText) {
+  const idx    = CATS.findIndex(c => c.l.toLowerCase() === String(parsed.category || '').toLowerCase());
+  const catIdx = idx >= 0 ? idx : 10; // Other
+  const dateStr = /^\d{4}-\d{2}-\d{2}$/.test(parsed.date || '') ? parsed.date : tday();
+
+  const snapshot = JSON.stringify(DB);
+  const obj = {
+    id: uid(),
+    desc: (parsed.description || originalText).trim().slice(0, 60) || originalText.slice(0, 60),
+    amount: Math.round(+parsed.amount * 100) / 100,
+    date: dateStr,
+    cat: catIdx,
+    lendTo: catIdx === CAT_LEND ? String(parsed.lendTo || '').trim().slice(0, 40) : '',
+    notes: '',
+    createdAt: new Date().toISOString()
+  };
+  DB.personal.unshift(obj);
   saveDB();
-  UNDO_STACK = null;
-  toast('Undone ✓');
-  // Refresh current view
-  if (CV==='personal') { buildMonthFilter(); rPersonal(); }
-  else if (CV==='groups') rGroups();
-  else rDash();
+
+  // The expense is saved at this point no matter what happens below —
+  // a render hiccup must never look like the log itself failed, and the
+  // two notices below must never both fire for the same save.
+  const label = cat(catIdx).e + ' ' + obj.desc + ' · ' + DB.currency + fmt(obj.amount) + ' logged';
+  const refresh = () => { if (CV === 'personal') { buildMonthFilter(); rPersonal(); } else rDash(); };
+  try {
+    _undoToast(snapshot, label, refresh);
+  } catch (toastErr) {
+    console.error('Quick-add logged but undo toast failed:', toastErr);
+    toast(label);
+  }
+  try {
+    refresh();
+  } catch (renderErr) {
+    console.error('Quick-add logged but view refresh failed:', renderErr);
+  }
 }
 
 // ── SPEED-DIAL FAB ───────────────────────────
@@ -1092,7 +1190,8 @@ function saveRecurring() {
 function deleteRecurring(id) {
   const snap = JSON.stringify(DB);
   DB.recurring = (DB.recurring||[]).filter(r=>r.id!==id);
-  saveWithUndo('Recurring deleted', rDash);
+  saveDB();
+  _undoToast(snap, 'Recurring deleted', rDash);
   rDash();
 }
 
@@ -1448,6 +1547,13 @@ function rDash() {
     + '<div class="ph">'
       + '<div class="pt">'+now.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})+'</div>'
       + '<div class="ps">'+now.toLocaleDateString('en-IN',{weekday:'long'})+'</div>'
+    + '</div>'
+
+    + '<div class="qa">'
+      + '<input class="qa-inp" id="qa-inp" placeholder="ate a burger for 200…" autocomplete="off" onkeydown="if(event.key===\'Enter\')submitQuickAdd()">'
+      + '<button class="qa-btn" id="qa-btn" onclick="submitQuickAdd()" title="Log it">'
+        + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>'
+      + '</button>'
     + '</div>'
 
     + '<div class="sr sr4">'
@@ -2628,12 +2734,14 @@ function openCfg(){
   document.getElementById('cfg-cur').value    = DB.currency;
   document.getElementById('cfg-budget').value = DB.budget||'';
   document.getElementById('cfg-pfx').textContent = DB.currency;
+  document.getElementById('cfg-gkey').value   = DB.geminiKey||'';
   document.getElementById('m-cfg').classList.add('open');
 }
 function saveSettings(){
-  DB.user     = document.getElementById('cfg-name').value.trim()||'You';
-  DB.currency = document.getElementById('cfg-cur').value;
-  DB.budget   = parseFloat(document.getElementById('cfg-budget').value)||0;
+  DB.user       = document.getElementById('cfg-name').value.trim()||'You';
+  DB.currency   = document.getElementById('cfg-cur').value;
+  DB.budget     = parseFloat(document.getElementById('cfg-budget').value)||0;
+  DB.geminiKey  = document.getElementById('cfg-gkey').value.trim();
   saveDB(); closeMod('m-cfg'); toast('Settings saved'); showView(CV);
 }
 
@@ -2976,8 +3084,10 @@ function saveMaintItem() {
 
 function deleteMaintItem(id) {
   const item = (DB.maintenance||[]).find(x=>x.id===id);
+  const snap = JSON.stringify(DB);
   DB.maintenance = (DB.maintenance||[]).filter(x=>x.id!==id);
-  saveWithUndo(`"${item?.name||'Item'}" deleted`, rMaintain);
+  saveDB();
+  _undoToast(snap, `"${item?.name||'Item'}" deleted`, rMaintain);
   rMaintain();
 }
 
