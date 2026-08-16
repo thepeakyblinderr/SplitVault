@@ -202,6 +202,10 @@ body{
 .fiw{display:flex}
 .fip{background:var(--bg3);border:1px solid var(--brd2);border-right:none;border-radius:var(--r) 0 0 var(--r);padding:10px 10px;font-family:var(--mono);font-size:13px;color:var(--ink3);display:flex;align-items:center}
 .fiw .fi{border-radius:0 var(--r) var(--r) 0}
+.fi-wrap{position:relative}
+.fi-wrap .fi{padding-right:40px}
+.fi-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:32px;height:32px;border:none;background:none;cursor:pointer;font-size:15px;opacity:.55;border-radius:8px;display:grid;place-items:center;transition:opacity .1s}
+.fi-eye:hover{opacity:.9}
 
 /* ── CAT PICKER ── */
 .catg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
@@ -350,6 +354,13 @@ body{
   background:var(--bg2);border-top:1px solid var(--brd);
 }
 .composer.show{display:flex}
+.qa-err{position:absolute;left:16px;right:16px;bottom:100%;margin-bottom:6px;background:var(--rbg);color:var(--red);font-size:12px;font-weight:700;padding:8px 12px;border-radius:10px;display:none;align-items:center;justify-content:space-between;gap:8px;box-shadow:var(--sh)}
+.qa-err.show{display:flex}
+.qa-err button{background:none;border:none;color:inherit;font-size:14px;cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0}
+.qa-badge{position:absolute;left:16px;bottom:100%;margin-bottom:6px;background:var(--bg3);color:var(--ink3);font-size:11px;font-weight:700;font-family:var(--mono);padding:5px 10px;border-radius:999px;display:none;align-items:center;gap:6px}
+.qa-badge.show{display:flex}
+.qa-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--accent1);animation:qaBadgePulse 1s ease-in-out infinite}
+@keyframes qaBadgePulse{0%,100%{opacity:.3}50%{opacity:1}}
 .composer-field{flex:1;min-width:0;display:flex;align-items:center;background:var(--bg);border:1px solid var(--brd2);border-radius:999px;padding:9px 16px}
 .composer-field input{width:100%;border:none;outline:none;background:transparent;font-family:var(--sans);font-size:15px;font-weight:600;color:var(--ink);letter-spacing:-.01em}
 .composer-field input::placeholder{color:var(--ink4);font-weight:500}
@@ -418,6 +429,8 @@ body{
 
 <!-- ── QUICK-ADD COMPOSER (Home only) ── -->
 <div class="composer" id="composer">
+  <div class="qa-err" id="qa-err"><span id="qa-err-text"></span><button type="button" onclick="dismissAiErr()">×</button></div>
+  <div class="qa-badge" id="qa-badge"><span class="dot"></span>AI…</div>
   <div class="composer-field">
     <input id="qa-inp" type="text" placeholder="ate a burger for 200…" autocomplete="off" onkeydown="if(event.key==='Enter')submitQuickAdd()">
   </div>
@@ -570,9 +583,13 @@ body{
         <div class="fiw"><div class="fip" id="cfg-pfx">₹</div><input type="number" class="fi" id="cfg-budget" placeholder="e.g. 20000" min="0" step="100"></div>
       </div>
       <div class="fg">
-        <label class="fl">Gemini API Key</label>
-        <input type="password" class="fi" id="cfg-gkey" placeholder="Paste your Gemini API key" autocomplete="off">
-        <div style="font-size:11px;color:var(--ink4);margin-top:2px;">Powers the quick-add box on Home — type "burger 200" and it logs itself. Get a free key at Google AI Studio. Stored only on this device, sent directly to Google when you use quick-add.</div>
+        <label class="fl">AICredits API Key</label>
+        <div class="fi-wrap">
+          <input type="password" class="fi" id="cfg-aikey" placeholder="AICredits API key..." autocomplete="off" oninput="onAiKeyInput()">
+          <button type="button" class="fi-eye" id="cfg-aikey-eye" onclick="toggleAiKeyVisibility()" title="Show/hide key">👁</button>
+        </div>
+        <div style="font-size:11px;color:var(--ink4);margin-top:2px;">🔒 PAY IN INR VIA UPI AT aicredits.in · KEY STAYS ON YOUR DEVICE · LEAVE BLANK FOR MANUAL ENTRY</div>
+        <div id="cfg-ai-err" style="display:none;font-size:11px;color:var(--red);font-weight:700;margin-top:4px;"></div>
       </div>
     </div>
   </div>
@@ -786,15 +803,14 @@ function loadDB() {
       if (!d.lendHistory)  d.lendHistory  = [];
       if (!d.recurring)    d.recurring    = [];
       if (!d.maintenance)  d.maintenance  = [];
-      if (d.geminiKey == null) d.geminiKey = '';
       return d;
     }
   } catch(_){}
   try {
     const old = localStorage.getItem('sv3');
-    if (old) { const d=JSON.parse(old); d.version=4; d.lendHistory=[]; d.recurring=[]; d.maintenance=[]; d.geminiKey=''; return d; }
+    if (old) { const d=JSON.parse(old); d.version=4; d.lendHistory=[]; d.recurring=[]; d.maintenance=[]; return d; }
   } catch(_){}
-  return {user:'You',groups:[],personal:[],currency:'₹',budget:0,lendHistory:[],recurring:[],maintenance:[],geminiKey:'',version:4};
+  return {user:'You',groups:[],personal:[],currency:'₹',budget:0,lendHistory:[],recurring:[],maintenance:[],version:4};
 }
 function saveDB() { localStorage.setItem(KEY, JSON.stringify(DB)); }
 
@@ -830,9 +846,134 @@ function toast(msg) {
 // (See _undoToast/_doUndoManual below, shared by every delete/auto-log action.)
 let UNDO_STACK = null; // { snapshot: DB_JSON, label: string, timer: id, afterFn }
 
-// ── QUICK ADD (Gemini) ───────────────────────
+// ── QUICK ADD (AICredits / Claude) ────────────
 const QA_ICON_ARROW  = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
 const QA_ICON_SPIN   = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-9-9" opacity=".9"/></svg>';
+
+// Kept in memory only — never written to DB/localStorage. Gone on reload;
+// never sent anywhere except the Authorization header of a request the
+// user's own key pays for.
+let aiApiKey   = '';
+let aiInFlight = false;
+
+const AI_SYSTEM_PROMPT =
+  'You are an expense parser. The user types one line describing a spend.\n' +
+  'Return ONLY valid JSON, no prose, no markdown fences:\n' +
+  '{"amount": <number>, "description": "<3-5 words>", "category": "<one of: Food, Transport, Entertainment, Shopping, Bills, Health, Other>"}\n' +
+  'Rules:\n' +
+  '- amount is a number, not a string, no currency symbol\n' +
+  '- description is Title Case, concise\n' +
+  '- If the line is ambiguous or has no amount, return {"error": "<short reason>"}\n' +
+  '- Never include any text outside the JSON object';
+
+// aicredits.in's 7-category enum -> this app's CATS index (see CATS above)
+const AI_CAT_TO_IDX = { food:0, transport:1, entertainment:4, shopping:3, bills:7, health:5, other:10 };
+
+function onAiKeyInput() {
+  aiApiKey = document.getElementById('cfg-aikey').value.trim();
+  hideAiErr();
+}
+function toggleAiKeyVisibility() {
+  const inp = document.getElementById('cfg-aikey');
+  const eye = document.getElementById('cfg-aikey-eye');
+  if (!inp) return;
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  if (eye) eye.textContent = show ? '🙈' : '👁';
+}
+
+function showAiErr(msg) {
+  const el = document.getElementById('qa-err');
+  const txt = document.getElementById('qa-err-text');
+  if (el && txt) { txt.textContent = msg; el.classList.add('show'); }
+  const cfgErr = document.getElementById('cfg-ai-err');
+  if (cfgErr) { cfgErr.textContent = msg; cfgErr.style.display = ''; }
+}
+function dismissAiErr() {
+  document.getElementById('qa-err')?.classList.remove('show');
+}
+function hideAiErr() {
+  dismissAiErr();
+  const cfgErr = document.getElementById('cfg-ai-err');
+  if (cfgErr) cfgErr.style.display = 'none';
+}
+function setAiBadge(on) {
+  document.getElementById('qa-badge')?.classList.toggle('show', !!on);
+}
+
+// Gated fetch to the AICredits proxy: no key -> null (caller falls back to
+// manual entry), one call in flight at a time, always resolves rather than
+// throwing so the caller doesn't need a separate catch for AI-specific
+// failures — a null return with a banner already shown covers all of them.
+async function parseExpense(text) {
+  if (!aiApiKey) return null;
+  if (aiInFlight) return null;
+  aiInFlight = true;
+  setAiBadge(true);
+  try {
+    const res = await fetch('https://api.aicredits.in/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + aiApiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-sonnet-4-20250514',
+        max_tokens: 150,
+        messages: [
+          { role: 'system', content: AI_SYSTEM_PROMPT },
+          { role: 'user',   content: text }
+        ]
+      })
+    });
+
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => '');
+      let apiMsg = bodyText;
+      try { apiMsg = JSON.parse(bodyText)?.error?.message || bodyText; } catch(_) {}
+      const lower = (apiMsg || '').toLowerCase();
+      if (res.status === 401 || /\bauth\b|\bkey\b/.test(lower)) {
+        showAiErr('BAD KEY');
+        aiApiKey = '';
+        const inp = document.getElementById('cfg-aikey'); if (inp) inp.value = '';
+      } else if (res.status === 402 || /credit|balance/.test(lower)) {
+        showAiErr('NO CREDITS');
+        aiApiKey = '';
+        const inp = document.getElementById('cfg-aikey'); if (inp) inp.value = '';
+      } else if (res.status === 429) {
+        showAiErr('RATE LIMITED — TRY AGAIN');
+      } else {
+        showAiErr('AI ERR ' + res.status + ': ' + (apiMsg || '').slice(0, 80));
+      }
+      return null;
+    }
+
+    const data = await res.json();
+    const raw  = data?.choices?.[0]?.message?.content;
+    if (!raw) { showAiErr('AI ERR: empty response'); return null; }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (parseErr) {
+      showAiErr(raw.slice(0, 120)); // parse failure — show the raw response
+      return null;
+    }
+
+    if (parsed.error) { showAiErr(String(parsed.error).slice(0, 120)); return null; }
+    if (typeof parsed.amount !== 'number' || !(parsed.amount > 0)) {
+      showAiErr('Could not find an amount in that');
+      return null;
+    }
+    return parsed;
+  } catch (err) {
+    showAiErr('AI ERR: ' + String(err?.message || err).slice(0, 80));
+    return null;
+  } finally {
+    aiInFlight = false;
+    setAiBadge(false);
+  }
+}
 
 async function submitQuickAdd() {
   const inp = document.getElementById('qa-inp');
@@ -841,12 +982,16 @@ async function submitQuickAdd() {
   const text = inp.value.trim();
   if (!text) return;
 
-  if (!DB.geminiKey) {
-    toast('Add a Gemini API key in Settings first');
-    openCfg();
+  // No key set — skip the AI path, open the manual form prefilled with
+  // what was typed rather than blocking the user.
+  if (!aiApiKey) {
+    inp.value = '';
+    openAddP(null);
+    document.getElementById('ap-desc').value = text;
     return;
   }
 
+  hideAiErr();
   inp.value = '';
   inp.disabled = true; btn.disabled = true;
   btn.classList.add('busy'); btn.innerHTML = QA_ICON_SPIN;
@@ -855,13 +1000,19 @@ async function submitQuickAdd() {
   _insertOptimisticRow(tempId, text);
 
   try {
-    const parsed = await geminiParseExpense(text);
+    const parsed = await parseExpense(text);
     _removeOptimisticRow(tempId);
-    logQuickExpense(parsed, text);
+    if (!parsed) {
+      // parseExpense already surfaced a reason in the qa-err banner
+      openAddP(null);
+      document.getElementById('ap-desc').value = text;
+    } else {
+      logQuickExpense(parsed, text);
+    }
   } catch (err) {
     console.error('Quick-add parse failed:', err);
     _removeOptimisticRow(tempId);
-    toast('Could not parse that — try rephrasing, or add it manually');
+    showAiErr('Could not parse that — try rephrasing, or add it manually');
   } finally {
     inp.disabled = false; btn.disabled = false;
     btn.classList.remove('busy'); btn.innerHTML = QA_ICON_ARROW;
@@ -870,9 +1021,9 @@ async function submitQuickAdd() {
 }
 
 // Shows the typed text in Today's list immediately (with a "thinking" pulse)
-// while Gemini parses it, instead of leaving the composer looking idle for
-// the ~1-2s round trip. logQuickExpense() replaces this with the real row
-// once parsing resolves — errors just remove it, nothing was ever saved.
+// while the AI parses it, instead of leaving the composer looking idle for
+// the round trip. logQuickExpense() replaces this with the real row once
+// parsing resolves — a null result just removes it, nothing was ever saved.
 function _insertOptimisticRow(id, text) {
   const container = document.getElementById('today-rows');
   if (!container) return;
@@ -890,130 +1041,19 @@ function _removeOptimisticRow(id) {
   document.getElementById(id)?.remove();
 }
 
-// Model names get retired over time — and Google's ListModels catalog keeps
-// listing a retired model as generateContent-capable even after it starts
-// 404ing on actual calls ("no longer available to new users"). So picking
-// a model isn't enough; a pick that 404s has to be blacklisted and the next
-// candidate tried, not re-picked deterministically forever. The blacklist
-// and the working pick are both cached per API key so this only costs a
-// network round-trip the first time, and again whenever a pick goes bad.
-function _gCacheValid() {
-  if (DB._gModelKey !== DB.geminiKey) { DB._gModel = null; DB._gBadModels = []; DB._gModelKey = DB.geminiKey; }
-  return DB._gModel;
-}
-
-async function resolveGeminiModel(excludeCurrent) {
-  if (excludeCurrent && DB._gModel) {
-    DB._gBadModels = Array.from(new Set([...(DB._gBadModels || []), DB._gModel]));
-    DB._gModel = null;
-  }
-  if (_gCacheValid()) return DB._gModel;
-
-  const res = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(DB.geminiKey)
-  );
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error('Could not list Gemini models (' + res.status + '): ' + body.slice(0, 200));
-  }
-  const data = await res.json();
-  const bad  = new Set(DB._gBadModels || []);
-  const usable = (data.models || [])
-    .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
-    .map(m => m.name.replace(/^models\//, ''))
-    .filter(name => !bad.has(name));
-  if (!usable.length) throw new Error('No usable Gemini models left to try for this API key');
-
-  // The catalog also lists plenty of non-text models under "generateContent"
-  // (TTS, image/audio/video generation, embeddings, live-only variants) —
-  // matching on "flash" alone picked gemini-2.5-flash-preview-tts once,
-  // which can't return text at all. Steer hard away from those, then rank
-  // by how close to a plain chat model the name looks.
-  const isSpecialty = n => /tts|audio|image|imagen|embed|vision|aqa|veo|live|computer-use|banana|robotics|learnlm/i.test(n);
-  const pick =
-    usable.find(n => /^gemini-[\d.]+-flash(-\d+)?$/.test(n)) ||
-    usable.find(n => /flash/i.test(n) && !isSpecialty(n) && !/lite|8b/i.test(n)) ||
-    usable.find(n => /flash/i.test(n) && !isSpecialty(n)) ||
-    usable.find(n => !isSpecialty(n)) ||
-    usable[0];
-
-  DB._gModel = pick; DB._gModelKey = DB.geminiKey; saveDB();
-  return pick;
-}
-
-async function callGemini(model, prompt, schema) {
-  return fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + encodeURIComponent(DB.geminiKey),
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json', responseSchema: schema }
-      })
-    }
-  );
-}
-
-async function geminiParseExpense(text) {
-  const catLabels = CATS.map(c => c.l);
-  const schema = {
-    type: 'OBJECT',
-    properties: {
-      amount:      { type: 'NUMBER',  description: 'Numeric amount only, no currency symbol.' },
-      description: { type: 'STRING',  description: 'Short 2-4 word label for what it was, e.g. "Burger".' },
-      category:    { type: 'STRING',  enum: catLabels },
-      date:        { type: 'STRING',  description: 'Resolved date in YYYY-MM-DD format.' },
-      lendTo:      { type: 'STRING',  description: 'Person’s name if money was lent out, else empty string.' }
-    },
-    required: ['amount', 'description', 'category', 'date']
-  };
-  const prompt =
-    'You are an expense-logging assistant for a personal finance app. ' +
-    'Today’s date is ' + tday() + ' (YYYY-MM-DD). ' +
-    'Parse the following into a single expense entry: "' + text.replace(/"/g, '\\"') + '"\n' +
-    'Resolve any relative date words ("today", "yesterday", a weekday, etc.) against today’s date. ' +
-    'If no date is mentioned, use today. Pick exactly one category from the allowed list that best fits. ' +
-    'Return only the JSON object.';
-
-  let model = await resolveGeminiModel(false);
-  let res   = await callGemini(model, prompt, schema);
-
-  // 404 = this model is dead for this key; 400 here typically means the
-  // picked model can't do what we asked (e.g. a TTS/audio-only model
-  // rejecting a text response request). Both are "this specific model
-  // doesn't work" rather than "the request itself is broken" — blacklist
-  // it and try the next candidate, a few times if needed, rather than
-  // re-picking the same bad model forever.
-  for (let tries = 0; (res.status === 404 || res.status === 400) && tries < 3; tries++) {
-    model = await resolveGeminiModel(true);
-    res   = await callGemini(model, prompt, schema);
-  }
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error('Gemini request failed (' + res.status + '): ' + body.slice(0, 200));
-  }
-  const data = await res.json();
-  const raw  = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!raw) throw new Error('Empty response from Gemini');
-  const obj = JSON.parse(raw);
-  if (!obj.amount || +obj.amount <= 0) throw new Error('No valid amount parsed');
-  return obj;
-}
-
 function logQuickExpense(parsed, originalText) {
-  const idx    = CATS.findIndex(c => c.l.toLowerCase() === String(parsed.category || '').toLowerCase());
-  const catIdx = idx >= 0 ? idx : 10; // Other
-  const dateStr = /^\d{4}-\d{2}-\d{2}$/.test(parsed.date || '') ? parsed.date : tday();
+  const catKey = String(parsed.category || '').trim().toLowerCase();
+  const byLabel = CATS.findIndex(c => c.l.toLowerCase() === catKey);
+  const catIdx = AI_CAT_TO_IDX[catKey] ?? (byLabel >= 0 ? byLabel : 10); // Other
 
   const snapshot = JSON.stringify(DB);
   const obj = {
     id: uid(),
     desc: (parsed.description || originalText).trim().slice(0, 60) || originalText.slice(0, 60),
     amount: Math.round(+parsed.amount * 100) / 100,
-    date: dateStr,
+    date: tday(),
     cat: catIdx,
-    lendTo: catIdx === CAT_LEND ? String(parsed.lendTo || '').trim().slice(0, 40) : '',
+    lendTo: '',
     notes: '',
     createdAt: new Date().toISOString()
   };
@@ -1997,14 +2037,15 @@ function openCfg(){
   document.getElementById('cfg-cur').value    = DB.currency;
   document.getElementById('cfg-budget').value = DB.budget||'';
   document.getElementById('cfg-pfx').textContent = DB.currency;
-  document.getElementById('cfg-gkey').value   = DB.geminiKey||'';
+  document.getElementById('cfg-aikey').value  = aiApiKey;
+  hideAiErr();
   document.getElementById('m-cfg').classList.add('open');
 }
 function saveSettings(){
   DB.user       = document.getElementById('cfg-name').value.trim()||'You';
   DB.currency   = document.getElementById('cfg-cur').value;
   DB.budget     = parseFloat(document.getElementById('cfg-budget').value)||0;
-  DB.geminiKey  = document.getElementById('cfg-gkey').value.trim();
+  aiApiKey      = document.getElementById('cfg-aikey').value.trim();
   saveDB(); closeMod('m-cfg'); toast('Settings saved'); showView(CV);
 }
 
