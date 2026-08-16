@@ -953,9 +953,17 @@ async function resolveGeminiModel(excludeCurrent) {
     .filter(name => !bad.has(name));
   if (!usable.length) throw new Error('No usable Gemini models left to try for this API key');
 
+  // The catalog also lists plenty of non-text models under "generateContent"
+  // (TTS, image/audio/video generation, embeddings, live-only variants) —
+  // matching on "flash" alone picked gemini-2.5-flash-preview-tts once,
+  // which can't return text at all. Steer hard away from those, then rank
+  // by how close to a plain chat model the name looks.
+  const isSpecialty = n => /tts|audio|image|imagen|embed|vision|aqa|veo|live|computer-use|banana|robotics|learnlm/i.test(n);
   const pick =
-    usable.find(n => /flash/i.test(n) && !/lite|vision|8b/i.test(n)) ||
-    usable.find(n => /flash/i.test(n)) ||
+    usable.find(n => /^gemini-[\d.]+-flash(-\d+)?$/.test(n)) ||
+    usable.find(n => /flash/i.test(n) && !isSpecialty(n) && !/lite|8b/i.test(n)) ||
+    usable.find(n => /flash/i.test(n) && !isSpecialty(n)) ||
+    usable.find(n => !isSpecialty(n)) ||
     usable[0];
 
   DB._gModel = pick; DB._gModelKey = DB.geminiKey; saveDB();
@@ -1000,10 +1008,13 @@ async function geminiParseExpense(text) {
   let model = await resolveGeminiModel(false);
   let res   = await callGemini(model, prompt, schema);
 
-  // A 404 means this specific model is dead for this key even though it was
-  // listed as usable — blacklist it and try the next candidate, a few times
-  // if needed, rather than re-picking the same dead model forever.
-  for (let tries = 0; res.status === 404 && tries < 3; tries++) {
+  // 404 = this model is dead for this key; 400 here typically means the
+  // picked model can't do what we asked (e.g. a TTS/audio-only model
+  // rejecting a text response request). Both are "this specific model
+  // doesn't work" rather than "the request itself is broken" — blacklist
+  // it and try the next candidate, a few times if needed, rather than
+  // re-picking the same bad model forever.
+  for (let tries = 0; (res.status === 404 || res.status === 400) && tries < 3; tries++) {
     model = await resolveGeminiModel(true);
     res   = await callGemini(model, prompt, schema);
   }
