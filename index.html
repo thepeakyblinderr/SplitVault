@@ -308,6 +308,13 @@ body{
 .fade{animation:fadeIn .2s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 
+/* ── BUDGET BAR (Home) ── */
+.bud-bar{margin-bottom:22px}
+.bud-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;font-family:var(--mono);color:var(--ink3);margin-bottom:6px}
+.bud-row b{color:var(--ink);font-weight:700}
+.bud-track{height:5px;border-radius:4px;background:var(--bg3);overflow:hidden}
+.bud-fill{height:100%;border-radius:4px;transition:width .4s}
+
 /* ── DIARY (Home) ── */
 .diary{display:flex;flex-direction:column}
 .diary.blank{min-height:calc(100dvh - var(--nh) - var(--th) - 200px)}
@@ -443,6 +450,9 @@ body{
   <div class="drawer-item" onclick="openLendingOverview()">
     Lending<span class="drawer-badge" id="drawer-lend-badge" style="display:none"></span>
   </div>
+  <div class="drawer-item" onclick="openOwedOverview()">
+    Owed<span class="drawer-badge" id="drawer-owe-badge" style="display:none"></span>
+  </div>
   <div class="drawer-item" onclick="openRecurringOverview()">
     Recurring
   </div>
@@ -494,6 +504,10 @@ body{
         <label class="fl">Lent to</label>
         <input type="text" class="fi" id="ap-lend-person" placeholder="Person's name" maxlength="40" autocomplete="off">
       </div>
+      <div class="fg" id="ap-owe-wrap" style="display:none">
+        <label class="fl">Owed to</label>
+        <input type="text" class="fi" id="ap-owe-person" placeholder="Person's name" maxlength="40" autocomplete="off">
+      </div>
       <div class="fg">
         <label class="fl">Notes (optional)</label>
         <textarea class="fta" id="ap-notes" rows="2" placeholder="Any note…"></textarea>
@@ -512,6 +526,15 @@ body{
   <div class="mhd"><div class="mtl">Lending</div><button class="mclose" onclick="closeMod('m-lending')">×</button></div>
   <div class="mbd" id="m-lending-body"></div>
   <div class="mft"><button class="btn bg bblk" onclick="closeMod('m-lending');openAddP(null,'lend')">+ Log money lent</button></div>
+</div>
+</div>
+
+<!-- OWED OVERVIEW -->
+<div class="ovr" id="m-owed">
+<div class="modal">
+  <div class="mhd"><div class="mtl">Owed</div><button class="mclose" onclick="closeMod('m-owed')">×</button></div>
+  <div class="mbd" id="m-owed-body"></div>
+  <div class="mft"><button class="btn bg bblk" onclick="closeMod('m-owed');openAddP(null,'owe')">+ Log money owed</button></div>
 </div>
 </div>
 
@@ -606,6 +629,17 @@ body{
 </div>
 </div>
 
+<!-- OWE LEDGER (per person) -->
+<div class="ovr" id="m-owe">
+<div class="modal">
+  <div class="mhd"><div class="mtl" id="owe-ttl">Debt Ledger</div><button class="mclose" onclick="closeMod('m-owe')">×</button></div>
+  <div class="mbd" id="owe-body"></div>
+  <div class="mft">
+    <button class="btn bp bblk" id="owe-partial-btn" onclick="recordOwePartialRepay()">Record Payment</button>
+  </div>
+</div>
+</div>
+
 <!-- RECURRING EXPENSE -->
 <div class="ovr" id="m-rec">
 <div class="modal">
@@ -691,6 +725,20 @@ body{
 </div>
 </div>
 
+<!-- MAINTENANCE DETAIL -->
+<div class="ovr" id="m-maint-det">
+<div class="modal">
+  <div class="mhd"><div class="mtl">Details</div><button class="mclose" onclick="closeMod('m-maint-det')">×</button></div>
+  <div class="mbd" id="m-maint-det-body"></div>
+  <div class="mft" style="padding:0 12px 22px;display:flex;flex-direction:column;gap:2px;">
+    <div class="drawer-item" onclick="maintDetLog()">Mark as Done</div>
+    <div class="drawer-item" onclick="maintDetEdit()">Edit</div>
+    <div class="drawer-item" id="maint-det-history" onclick="maintDetHistory()">History</div>
+    <div class="drawer-item" style="color:var(--red)" onclick="maintDetDelete()">Delete</div>
+  </div>
+</div>
+</div>
+
 <!-- LOG MAINTENANCE DONE -->
 <div class="ovr" id="m-maint-log">
 <div class="modal">
@@ -763,9 +811,11 @@ const CATS = [
   {e:'🤝',l:'Lend'},      // 9
   {e:'📦',l:'Other'},     // 10
   {e:'🔧',l:'Maintenance'}, // 11
+  {e:'💸',l:'Owe'},       // 12
 ];
 const CAT_LEND  = 9;
 const CAT_MAINT = 11;
+const CAT_OWE   = 12;
 const GICONS = [
   {e:'🏖️',l:'Beach'},  {e:'🏠',l:'Home'},   {e:'✈️',l:'Travel'}, {e:'🍕',l:'Food'},
   {e:'🎉',l:'Party'},  {e:'💼',l:'Work'},    {e:'🚗',l:'Car'},    {e:'🎮',l:'Gaming'},
@@ -799,6 +849,7 @@ function loadDB() {
     if (r) {
       const d = JSON.parse(r);
       if (!d.lendHistory)  d.lendHistory  = [];
+      if (!d.oweHistory)   d.oweHistory   = [];
       if (!d.recurring)    d.recurring    = [];
       if (!d.maintenance)  d.maintenance  = [];
       if (d.aiApiKey == null) d.aiApiKey = '';
@@ -807,9 +858,9 @@ function loadDB() {
   } catch(_){}
   try {
     const old = localStorage.getItem('sv3');
-    if (old) { const d=JSON.parse(old); d.version=4; d.lendHistory=[]; d.recurring=[]; d.maintenance=[]; d.aiApiKey=''; return d; }
+    if (old) { const d=JSON.parse(old); d.version=4; d.lendHistory=[]; d.oweHistory=[]; d.recurring=[]; d.maintenance=[]; d.aiApiKey=''; return d; }
   } catch(_){}
-  return {user:'You',groups:[],personal:[],currency:'₹',budget:0,lendHistory:[],recurring:[],maintenance:[],aiApiKey:'',version:4};
+  return {user:'You',groups:[],personal:[],currency:'₹',budget:0,lendHistory:[],oweHistory:[],recurring:[],maintenance:[],aiApiKey:'',version:4};
 }
 function saveDB() { localStorage.setItem(KEY, JSON.stringify(DB)); }
 
@@ -856,17 +907,20 @@ let aiApiKey   = '';
 let aiInFlight = false;
 
 const AI_SYSTEM_PROMPT =
-  'You are an expense parser. The user types one line describing a spend.\n' +
+  'You are an expense parser. The user types one line describing a spend or a debt between them and another person.\n' +
   'Return ONLY valid JSON, no prose, no markdown fences:\n' +
-  '{"amount": <number>, "description": "<3-5 words>", "category": "<one of: Food, Transport, Entertainment, Shopping, Bills, Health, Other>"}\n' +
+  '{"amount": <number>, "description": "<3-5 words>", "category": "<one of: Food, Transport, Entertainment, Shopping, Bills, Health, Lend, Owe, Other>", "person": "<name, only for Lend or Owe, else empty string>"}\n' +
   'Rules:\n' +
   '- amount is a number, not a string, no currency symbol\n' +
   '- description is Title Case, concise\n' +
+  '- Use "Lend" when the user says they lent, gave, or fronted money to someone (money owed back TO them)\n' +
+  '- Use "Owe" when the user says they owe, borrowed, or need to pay someone back (money THEY owe)\n' +
+  '- When category is Lend or Owe, put the other person\'s name in "person"; otherwise "person" is ""\n' +
   '- If the line is ambiguous or has no amount, return {"error": "<short reason>"}\n' +
   '- Never include any text outside the JSON object';
 
-// aicredits.in's 7-category enum -> this app's CATS index (see CATS above)
-const AI_CAT_TO_IDX = { food:0, transport:1, entertainment:4, shopping:3, bills:7, health:5, other:10 };
+// aicredits.in's category enum -> this app's CATS index (see CATS above)
+const AI_CAT_TO_IDX = { food:0, transport:1, entertainment:4, shopping:3, bills:7, health:5, lend:CAT_LEND, owe:CAT_OWE, other:10 };
 
 function onAiKeyInput() {
   aiApiKey = document.getElementById('cfg-aikey').value.trim();
@@ -1057,7 +1111,8 @@ function logQuickExpense(parsed, originalText) {
     amount: Math.round(+parsed.amount * 100) / 100,
     date: tday(),
     cat: catIdx,
-    lendTo: '',
+    lendTo: catIdx === CAT_LEND ? String(parsed.person || '').trim().slice(0, 40) : '',
+    oweTo:  catIdx === CAT_OWE  ? String(parsed.person || '').trim().slice(0, 40) : '',
     notes: '',
     createdAt: new Date().toISOString()
   };
@@ -1089,6 +1144,12 @@ function openDrawer() {
   if (badge) {
     if (totalLent > 0.5) { badge.textContent = DB.currency + fmt(totalLent); badge.style.display = ''; }
     else badge.style.display = 'none';
+  }
+  const { totalOwed } = _oweOutstanding();
+  const oweBadge = document.getElementById('drawer-owe-badge');
+  if (oweBadge) {
+    if (totalOwed > 0.5) { oweBadge.textContent = DB.currency + fmt(totalOwed); oweBadge.style.display = ''; }
+    else oweBadge.style.display = 'none';
   }
   document.getElementById('drawer-item-maintain')?.classList.toggle('active', CV === 'maintain');
   document.getElementById('drawer').classList.add('open');
@@ -1132,6 +1193,7 @@ function doSearch() {
   const pMatches = DB.personal.filter(e =>
     e.desc.toLowerCase().includes(q) ||
     (e.lendTo||'').toLowerCase().includes(q) ||
+    (e.oweTo||'').toLowerCase().includes(q) ||
     (e.notes||'').toLowerCase().includes(q) ||
     cat(e.cat).l.toLowerCase().includes(q)
   ).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 20);
@@ -1140,10 +1202,11 @@ function doSearch() {
     html += `<div class="srch-sec">Expenses (${pMatches.length})</div>`;
     pMatches.forEach(e => {
       const isLend = e.cat === CAT_LEND;
+      const isOwe  = e.cat === CAT_OWE;
       html += `<div class="cr" onclick="closeSearch();openPDet('${e.id}')">
         ${ciEl(e.cat)}
         <div class="cm"><div class="ct">${hilite(esc(e.desc), q)}</div><div class="cs">${cat(e.cat).l} · ${fDate(e.date)}</div></div>
-        <div class="crt"><div class="ca" style="color:${isLend?'var(--amb)':'var(--ink)'};">${cur}${fmt(e.amount)}</div></div>
+        <div class="crt"><div class="ca" style="color:${isLend?'var(--amb)':isOwe?'var(--red)':'var(--ink)'};">${cur}${fmt(e.amount)}</div></div>
       </div>`;
     });
   }
@@ -1290,7 +1353,7 @@ function logRecurringNow(id) {
 
   DB.personal.unshift({
     id: uid(), desc: r.name, amount: r.amount,
-    date: tday(), cat: r.cat, lendTo:'',
+    date: tday(), cat: r.cat, lendTo:'', oweTo:'',
     notes: r.notes||'', createdAt: new Date().toISOString()
   });
   saveDB(); toast(`${r.name} logged ✓`); rDash();
@@ -1434,6 +1497,17 @@ function _dashRecurring(cur) {
   return html;
 }
 
+// Month-to-date spend vs the monthly budget set in Settings. Lend/Owe are
+// excluded — they're not spending, just money moving between people.
+function _budgetStatus() {
+  if (!DB.budget) return null;
+  const ym = tday().slice(0,7); // YYYY-MM
+  const spent = DB.personal
+    .filter(e => e.date.startsWith(ym) && e.cat !== CAT_LEND && e.cat !== CAT_OWE)
+    .reduce((s,e) => s + +e.amount, 0);
+  return { spent, budget: DB.budget, pct: Math.min(100, spent / DB.budget * 100) };
+}
+
 // ═══════════════════════════════════════════════
 // DASHBOARD (Home — scrolling diary)
 // ═══════════════════════════════════════════════
@@ -1461,7 +1535,7 @@ function rDash() {
     const exps    = byDate[date];
     const isToday = date === today;
     const isYest  = date === yest;
-    const spend   = exps.filter(e => e.cat !== CAT_LEND).reduce((s,e) => s + +e.amount, 0);
+    const spend   = exps.filter(e => e.cat !== CAT_LEND && e.cat !== CAT_OWE).reduce((s,e) => s + +e.amount, 0);
 
     let label;
     if (isToday) label = 'Today';
@@ -1473,9 +1547,11 @@ function rDash() {
 
     const rowsHtml = exps.map(e => {
       const isLend = e.cat === CAT_LEND;
+      const isOwe  = e.cat === CAT_OWE;
+      const person = isLend ? e.lendTo : isOwe ? e.oweTo : '';
       return '<div class="dg-row" data-id="'+e.id+'" onclick="openPDet(\''+e.id+'\')">'
-        + '<div class="dg-desc">'+esc(e.desc)+(isLend&&e.lendTo?' <span style="color:var(--ink4);font-weight:500;">→ '+esc(e.lendTo)+'</span>':'')+'</div>'
-        + '<div class="dg-amt" style="'+(isLend?'color:var(--amb)':'')+'">'+cur+fmt(e.amount)+'</div>'
+        + '<div class="dg-desc">'+esc(e.desc)+(person?' <span style="color:var(--ink4);font-weight:500;">→ '+esc(person)+'</span>':'')+'</div>'
+        + '<div class="dg-amt" style="'+(isLend?'color:var(--amb)':isOwe?'color:var(--red)':'')+'">'+cur+fmt(e.amount)+'</div>'
       + '</div>';
     }).join('');
 
@@ -1500,8 +1576,19 @@ function rDash() {
     ? '<button class="btn bg bblk" style="margin-top:14px;" onclick="HOME_DAYS_SHOWN+=30;rDash()">Load earlier</button>'
     : '';
 
+  const bud = _budgetStatus();
+  const budgetHtml = bud ? (() => {
+    const over  = bud.spent > bud.budget;
+    const color = over ? 'var(--red)' : bud.pct >= 80 ? 'var(--amb)' : 'var(--grn)';
+    return '<div class="bud-bar">'
+      + '<div class="bud-row"><b>'+cur+fmt(bud.spent)+'</b>&nbsp;'+(over?'over':'of')+' '+cur+fmt(bud.budget)+' budget</div>'
+      + '<div class="bud-track"><div class="bud-fill" style="width:'+bud.pct.toFixed(1)+'%;background:'+color+';"></div></div>'
+    + '</div>';
+  })() : '';
+
   document.getElementById('v-dash').innerHTML =
     '<div class="ctn fade" style="padding-bottom:96px">'
+    + budgetHtml
     + '<div class="diary'+(isBlank?' blank':'')+'">' + groupsHtml + '</div>'
     + loadMoreHtml
     + '</div>';
@@ -1629,7 +1716,7 @@ function openLendingOverview() {
 function openRecurringOverview() {
   closeDrawer();
   const html = _dashRecurring(DB.currency);
-  document.getElementById('m-recurring-body').innerHTML = html || '<div class="empty"><div class="ei">🔁</div><div class="ett">No recurring expenses</div><div class="esb">Add rent, subscriptions, or anything that repeats.</div></div>';
+  document.getElementById('m-recurring-body').innerHTML = html || '<div class="empty"><div class="ei">🔁</div><div class="ett">No recurring expenses</div><div class="esb">Add rent, subscriptions, or anything that repeats.</div><button class="btn bp" onclick="closeMod(\'m-recurring\');openAddRecurring()">+ Add First Item</button></div>';
   openMod('m-recurring');
 }
 
@@ -1807,6 +1894,220 @@ function markRepaid(person) {
   saveDB(); toast(`${person} fully repaid ✓`); rDash();
 }
 
+// ─ Owe Ledger (money I owe other people) ────
+// Mirrors the Lend ledger above exactly, just inverted: CAT_OWE entries are
+// debts I've taken on, DB.oweHistory records payments I've made to clear them.
+function _oweOutstanding() {
+  if (!DB.oweHistory) DB.oweHistory = [];
+  const oweMap = {};
+  DB.personal.filter(e=>e.cat===CAT_OWE).forEach(e => {
+    const p=(e.oweTo||e.desc||'?').trim();
+    oweMap[p]=(oweMap[p]||0)+ +e.amount;
+  });
+  DB.oweHistory.forEach(r => { if(oweMap[r.person]!==undefined) oweMap[r.person]-= +r.amount; });
+  const oweRows  = Object.entries(oweMap).filter(([,v])=>v>0.5).sort((a,b)=>b[1]-a[1]);
+  const totalOwed = oweRows.reduce((s,[,v])=>s+v,0);
+  return { totalOwed, oweRows };
+}
+
+function openOwedOverview() {
+  closeDrawer();
+  const cur = DB.currency;
+  const { totalOwed, oweRows } = _oweOutstanding();
+  let html;
+  if (totalOwed > 0) {
+    const rowsHtml = oweRows.map(function(entry) {
+      const p = entry[0], amt = entry[1];
+      const debts  = DB.personal.filter(function(e){ return e.cat===CAT_OWE&&(e.oweTo||e.desc||'?').trim()===p; });
+      const oldest = debts.reduce(function(a,b){ return a.date<b.date?a:b; }, debts[0]);
+      const daysSince = oldest ? Math.floor((Date.now()-new Date(oldest.date+'T00:00:00'))/(1000*60*60*24)) : 0;
+      return '<div class="cr" onclick="closeMod(\'m-owed\');openOweLedger(\''+esc(p)+'\')">'
+        + '<div style="width:34px;height:34px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0;">'
+          + esc(p).charAt(0).toUpperCase()
+        + '</div>'
+        + '<div class="cm"><div class="ct">'+esc(p)+'</div>'
+          + '<div class="cs">Since '+fDate(oldest?oldest.date:'')+' · '+daysSince+'d</div></div>'
+        + '<div class="crt">'
+          + '<div class="ca" style="color:var(--red);">'+cur+fmt(amt)+'</div>'
+          + '<button class="btn bg bxs" style="margin-top:4px;" onclick="event.stopPropagation();markOweRepaid(\''+esc(p)+'\')">Paid ✓</button>'
+        + '</div>'
+      + '</div>';
+    }).join('');
+    html = '<div style="padding:10px 15px;background:var(--bg2);border-radius:var(--rl) var(--rl) 0 0;display:flex;justify-content:space-between;align-items:center;">'
+      + '<span style="font-size:10px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Outstanding</span>'
+      + '<span style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--red);">'+cur+fmt(totalOwed)+'</span>'
+    + '</div><div class="card">' + rowsHtml + '</div>';
+  } else {
+    html = '<div class="empty"><div class="ei">💸</div><div class="ett">Nothing owed</div><div class="esb">Use the Owe category when logging an expense to track money you owe someone.</div></div>';
+  }
+  document.getElementById('m-owed-body').innerHTML = html;
+  openMod('m-owed');
+}
+
+let OWE_PERSON = null; // person currently viewing in the debt ledger
+
+function openOweLedger(person) {
+  OWE_PERSON = person;
+  _renderOweLedger();
+  openMod('m-owe');
+}
+
+function _renderOweLedger() {
+  const person = OWE_PERSON;
+  const cur    = DB.currency;
+  if (!DB.oweHistory) DB.oweHistory = [];
+
+  // All debt entries to this person
+  const debts  = DB.personal
+    .filter(e => e.cat===CAT_OWE && (e.oweTo||e.desc||'?').trim()===person)
+    .sort((a,b) => a.date.localeCompare(b.date));
+
+  // All payment records to this person
+  const repays = DB.oweHistory
+    .filter(r => r.person===person)
+    .sort((a,b) => a.date.localeCompare(b.date));
+
+  const totalOwed   = debts.reduce((s,e)=>s+ +e.amount, 0);
+  const totalRepaid = repays.reduce((s,r)=>s+ +r.amount, 0);
+  const outstanding = Math.max(0, totalOwed - totalRepaid);
+  const fullyRepaid = outstanding < 0.5;
+
+  document.getElementById('owe-ttl').textContent = `${person}`;
+
+  const btn = document.getElementById('owe-partial-btn');
+  btn.textContent = fullyRepaid ? '✓ Fully Paid' : 'Record Payment';
+  btn.disabled    = fullyRepaid;
+  btn.className   = fullyRepaid ? 'btn bg bblk' : 'btn bp bblk';
+
+  // Build a merged timeline of debts taken on + payments made
+  const timeline = [
+    ...debts.map(e  => ({ type:'owe',   date:e.date,  amount:+e.amount, desc:e.desc,  id:e.id, notes:e.notes||'' })),
+    ...repays.map(r => ({ type:'repay', date:r.date,  amount:+r.amount, desc:'Paid',  id:r.id })),
+  ].sort((a,b)=>a.date.localeCompare(b.date));
+
+  const today     = new Date();
+  const firstOwe  = debts[0]?.date;
+  const lastRepay = repays.length ? repays[repays.length-1].date : null;
+  const daysOpen  = firstOwe
+    ? Math.floor((today - new Date(firstOwe+'T00:00:00'))/(1000*60*60*24))
+    : 0;
+  const daysTaken = (firstOwe && lastRepay && fullyRepaid)
+    ? Math.floor((new Date(lastRepay+'T00:00:00') - new Date(firstOwe+'T00:00:00'))/(1000*60*60*24))
+    : null;
+
+  document.getElementById('owe-body').innerHTML = `
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;">
+      <div class="sumc">
+        <div class="sumcl">Owed</div>
+        <div class="sumcv" style="color:var(--red);">${cur}${fmt(totalOwed)}</div>
+        <div class="sumcs">${debts.length} debt${debts.length!==1?'s':''}</div>
+      </div>
+      <div class="sumc">
+        <div class="sumcl">Paid</div>
+        <div class="sumcv" style="color:var(--grn);">${cur}${fmt(totalRepaid)}</div>
+        <div class="sumcs">${repays.length} payment${repays.length!==1?'s':''}</div>
+      </div>
+      <div class="sumc">
+        <div class="sumcl">Balance</div>
+        <div class="sumcv" style="color:${fullyRepaid?'var(--grn)':'var(--red)'};">${cur}${fmt(outstanding)}</div>
+        <div class="sumcs">${fullyRepaid?'Cleared':`${daysOpen}d open`}</div>
+      </div>
+    </div>
+
+    ${fullyRepaid && daysTaken !== null ? `
+    <div style="background:var(--gbg);border:none;border-radius:var(--rl);padding:12px 15px;margin-bottom:18px;display:flex;align-items:center;gap:10px;">
+      <div style="font-size:20px;">✅</div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--grn);">Fully paid off!</div>
+        <div style="font-size:11px;color:var(--grn);font-family:var(--mono);">Took ${daysTaken} day${daysTaken!==1?'s':''} · ${fDate(firstOwe)} → ${fDate(lastRepay)}</div>
+      </div>
+    </div>` : !fullyRepaid && firstOwe ? `
+    <div style="background:var(--rbg);border:none;border-radius:var(--rl);padding:12px 15px;margin-bottom:18px;display:flex;align-items:center;gap:10px;">
+      <div style="font-size:20px;">⏳</div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--red);">Pending payment</div>
+        <div style="font-size:11px;color:var(--red);font-family:var(--mono);">Owed since ${fDate(firstOwe)} · ${daysOpen} days ago · ${cur}${fmt(outstanding)} remaining</div>
+      </div>
+    </div>` : ''}
+<div class="slb" style="margin-bottom:10px;">Transaction Timeline</div>
+    <div style="position:relative;padding-left:24px;">
+<div style="position:absolute;left:7px;top:8px;bottom:8px;width:2px;background:var(--brd);border-radius:1px;"></div>
+      ${timeline.map((t,idx) => {
+        const isOwe   = t.type==='owe';
+        const dotCol  = isOwe ? 'var(--red)' : 'var(--grn)';
+        const daysSince = Math.floor((today - new Date(t.date+'T00:00:00'))/(1000*60*60*24));
+        return `<div style="position:relative;margin-bottom:14px;">
+          <div style="position:absolute;left:-20px;top:11px;width:12px;height:12px;border-radius:50%;background:${dotCol};border:2px solid var(--bg);box-shadow:0 0 0 2px ${dotCol};"></div>
+          <div style="background:var(--bg2);border:none;border-radius:var(--rl);padding:12px 14px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+              <div>
+                <div style="font-size:13px;font-weight:700;color:${isOwe?'var(--red)':'var(--grn)'};">${isOwe?'💸 Owed':'💚 Paid'}</div>
+                <div style="font-size:11px;color:var(--ink4);font-family:var(--mono);margin-top:2px;">${fDate(t.date)} · ${daysSince}d ago${isOwe&&t.notes?' · '+esc(t.notes):''}</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;">
+                <div style="font-family:var(--mono);font-size:15px;font-weight:700;color:${isOwe?'var(--red)':'var(--grn)'};">${isOwe?'+':'-'}${cur}${fmt(t.amount)}</div>
+                ${isOwe?`<button class="btn bxs" style="margin-top:5px;background:transparent;border:1.5px solid var(--brd);color:var(--ink3);font-size:10px;" onclick="editOweEntry('${t.id}')">Edit</button>`:''}
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+      ${timeline.length===0?`<div style="color:var(--ink4);font-size:13px;padding:8px 0;">No transactions yet.</div>`:''}
+    </div>`;
+}
+
+function editOweEntry(id) {
+  closeMod('m-owe');
+  setTimeout(() => openAddP(id), 200);
+}
+
+function recordOwePartialRepay() {
+  const person = OWE_PERSON;
+  const cur    = DB.currency;
+  if (!DB.oweHistory) DB.oweHistory = [];
+
+  const debts     = DB.personal.filter(e => e.cat===CAT_OWE && (e.oweTo||e.desc||'?').trim()===person);
+  const repays    = DB.oweHistory.filter(r => r.person===person);
+  const totalOwed = debts.reduce((s,e)=>s+ +e.amount,0);
+  const totalRep  = repays.reduce((s,r)=>s+ +r.amount,0);
+  const outstanding = totalOwed - totalRep;
+
+  if (outstanding <= 0) { toast('Already fully paid'); return; }
+
+  const input = prompt(`Payment to ${person}\nOutstanding: ${cur}${fmt(outstanding)}\n\nAmount paid (blank = full):`, outstanding.toFixed(2));
+  if (input === null) return;
+  const amt = parseFloat(input) || outstanding;
+  if (amt <= 0) { toast('Enter a valid amount'); return; }
+  if (amt > outstanding + 0.01) { toast(`Cannot exceed outstanding ${cur}${fmt(outstanding)}`); return; }
+
+  const oldestDebt = debts.reduce((a,b)=>a.date<b.date?a:b, debts[0]);
+
+  DB.oweHistory.push({
+    id:uid(), person, amount:+amt,
+    date:tday(), owedOn: oldestDebt?.date||'',
+    notes:''
+  });
+  saveDB();
+  toast(`${cur}${fmt(amt)} payment recorded`);
+  _renderOweLedger();
+  if (CV==='dash') rDash();
+}
+
+function markOweRepaid(person) {
+  if (!confirm(`Mark all debts to "${person}" as fully paid? This records a payment entry — the debt history is preserved.`)) return;
+  const cur    = DB.currency;
+  if (!DB.oweHistory) DB.oweHistory = [];
+  const debts    = DB.personal.filter(e => e.cat===CAT_OWE && (e.oweTo||e.desc||'?').trim()===person);
+  const repays   = DB.oweHistory.filter(r => r.person===person);
+  const totalOwed = debts.reduce((s,e)=>s+ +e.amount,0);
+  const totalRep  = repays.reduce((s,r)=>s+ +r.amount,0);
+  const outstanding = totalOwed - totalRep;
+  if (outstanding <= 0) { toast('Already fully paid'); return; }
+  const oldestDebt = debts.reduce((a,b)=>a.date<b.date?a:b, debts[0]);
+  DB.oweHistory.push({id:uid(), person, amount:+outstanding, date:tday(), owedOn:oldestDebt?.date||'', notes:'Full payment'});
+  saveDB(); toast(`${person} fully paid ✓`); rDash();
+}
+
 // ═══════════════════════════════════════════════
 // PERSONAL
 // ═══════════════════════════════════════════════
@@ -1816,9 +2117,13 @@ function openPDet(id) {
   CEI=id;
   const e = DB.personal.find(x=>x.id===id); if (!e) return;
 
-  // Lend entries → open ledger instead
+  // Lend/Owe entries → open the matching ledger instead
   if (e.cat===CAT_LEND) {
     openLendLedger((e.lendTo||e.desc||'?').trim());
+    return;
+  }
+  if (e.cat===CAT_OWE) {
+    openOweLedger((e.oweTo||e.desc||'?').trim());
     return;
   }
 
@@ -1857,19 +2162,23 @@ function openAddP(editId, preset) {
     document.getElementById('ap-notes').value = e.notes||'';
     document.getElementById('ap-date').value  = e.date;
     document.getElementById('ap-lend-person').value = e.lendTo||'';
+    document.getElementById('ap-owe-person').value  = e.oweTo||'';
   } else {
     document.getElementById('ap-desc').value  = '';
     document.getElementById('ap-amt').value   = '';
     document.getElementById('ap-notes').value = '';
     document.getElementById('ap-date').value  = tday();
     document.getElementById('ap-lend-person').value = '';
+    document.getElementById('ap-owe-person').value  = '';
     if (preset==='lend') AP_CAT = CAT_LEND;
+    else if (preset==='owe') AP_CAT = CAT_OWE;
   }
 
   document.getElementById('ap-ttl').textContent  = editId ? 'Edit Expense' : 'Add Expense';
   document.getElementById('ap-save').textContent = editId ? 'Update' : 'Save Expense';
   document.getElementById('ap-pfx').textContent  = DB.currency;
   document.getElementById('ap-lend-wrap').style.display = AP_CAT===CAT_LEND ? 'grid' : 'none';
+  document.getElementById('ap-owe-wrap').style.display  = AP_CAT===CAT_OWE  ? 'grid' : 'none';
   _renderAPCats();
   openMod('m-addp');
   setTimeout(() => document.getElementById('ap-desc').focus(), 280);
@@ -1884,6 +2193,7 @@ function _renderAPCats() {
 function pickAPCat(i) {
   AP_CAT = i; _renderAPCats();
   document.getElementById('ap-lend-wrap').style.display = i===CAT_LEND ? 'grid' : 'none';
+  document.getElementById('ap-owe-wrap').style.display  = i===CAT_OWE  ? 'grid' : 'none';
 }
 
 function savePersonal() {
@@ -1897,6 +2207,7 @@ function savePersonal() {
   const obj = {
     id: EEI||uid(), desc, amount:amt, date, cat:AP_CAT,
     lendTo: AP_CAT===CAT_LEND ? document.getElementById('ap-lend-person').value.trim() : '',
+    oweTo:  AP_CAT===CAT_OWE  ? document.getElementById('ap-owe-person').value.trim()  : '',
     notes: document.getElementById('ap-notes').value.trim(),
     createdAt: new Date().toISOString()
   };
@@ -1955,7 +2266,7 @@ function rAnalytics() {
   const yrs=[...new Set(DB.personal.map(e=>e.date.slice(0,4)).filter(Boolean))].sort((a,b)=>b-a);
   if(!yrs.includes(String(AY)))AY=parseInt(yrs[0])||new Date().getFullYear();
   const yr=String(AY); const cur=DB.currency;
-  const exps=DB.personal.filter(e=>e.cat!==CAT_LEND&&e.date.startsWith(yr));
+  const exps=DB.personal.filter(e=>e.cat!==CAT_LEND&&e.cat!==CAT_OWE&&e.date.startsWith(yr));
   const tExp=exps.reduce((s,e)=>s+ +e.amount,0);
   const mly=Array(12).fill(0);
   exps.forEach(e=>mly[parseInt(e.date.split('-')[1])-1]+= +e.amount);
@@ -2106,6 +2417,7 @@ const MAINT_ICONS = [
 let MAINT_ICON_IDX = 0;
 let MAINT_EID      = null;
 let MAINT_LOG_ID   = null;
+let MAINT_DET_ID   = null;
 
 function maintDueDate(item) {
   if (!item.lastDate) return null;
@@ -2180,91 +2492,57 @@ function rMaintain() {
     Object.entries(byAsset).map(([asset,aItems])=>`
     <div class="sec">
       <div class="slb">${esc(asset)} <span class="badge">${aItems.length}</span></div>
-      <div style="display:grid;gap:10px;">${aItems.map(item=>_maintCard(item,cur)).join('')}</div>
+      <div class="card">${aItems.map(item=>_maintRow(item,cur)).join('')}</div>
     </div>`).join('')}
   </div>`;
 }
 
-function _maintCard(item, cur) {
-  const st       = maintStatus(item);
-  const due      = maintDueDate(item);
-  const dl       = maintDaysUntil(item);
-  const hist     = item.history||[];
-  const lastCost = hist.length ? hist[hist.length-1].cost : (item.lastCost||0);
-  const total    = totalMaintCost(item);
-  const isOver   = dl!==null && dl<0;
-  const isSoon   = dl!==null && dl>=0 && dl<=7;
-  const borderCol = isOver ? 'rgba(184,70,58,.25)' : isSoon ? 'rgba(150,99,31,.25)' : 'var(--brd)';
-  const barCol    = isOver ? 'var(--red)' : isSoon ? 'var(--amb)' : 'var(--grn)';
-  let pct = 0;
-  if (item.lastDate && due) {
-    const last = new Date(item.lastDate+'T00:00:00');
-    pct = Math.min(100, Math.max(0, ((new Date()-last)/(due-last))*100));
-  }
-
-  // Progress bar section
-  const progressHtml = (item.lastDate && due)
-    ? '<div style="padding:0 15px 12px;">'
-        + '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink4);font-family:var(--mono);margin-bottom:5px;">'
-          + '<span>Last: ' + fDate(item.lastDate) + '</span>'
-          + '<span>Next: ' + fDate(due.toISOString().slice(0,10)) + '</span>'
-        + '</div>'
-        + '<div style="height:7px;background:var(--bg3);border-radius:4px;overflow:hidden;">'
-          + '<div style="height:100%;width:' + pct.toFixed(1) + '%;background:' + barCol + ';border-radius:4px;transition:width .4s;"></div>'
-        + '</div>'
-        + '<div style="font-size:10px;color:var(--ink4);font-family:var(--mono);margin-top:4px;text-align:right;">' + pct.toFixed(0) + '% of interval elapsed</div>'
-      + '</div>'
-    : '';
-
-  // History button — only if there's history
-  const histBtn = hist.length
-    ? '<button class="btn bg bsm" onclick="openMaintHistory(\'' + item.id + '\')">📋 History (' + hist.length + ')</button>'
-    : '';
-
-  return '<div style="background:var(--bg);border:1px solid ' + borderCol + ';border-radius:var(--rl);overflow:hidden;">'
-
-    // Header
-    + '<div style="display:flex;align-items:flex-start;gap:12px;padding:14px 15px 10px;">'
-      + '<div style="width:44px;height:44px;border-radius:10px;background:var(--bg3);display:grid;place-items:center;font-size:22px;flex-shrink:0;">' + (item.icon||'🔧') + '</div>'
-      + '<div style="flex:1;min-width:0;">'
-        + '<div style="font-size:15px;font-weight:800;letter-spacing:-.03em;">' + esc(item.name) + '</div>'
-        + (item.asset ? '<div style="font-size:11px;color:var(--ink3);font-family:var(--mono);margin-top:1px;">📌 Asset: ' + esc(item.asset) + '</div>' : '')
-        + '<div style="font-size:11px;color:var(--ink4);font-family:var(--mono);margin-top:2px;">🔄 Every ' + item.interval + ' ' + item.unit + '</div>'
-      + '</div>'
-      + '<div style="text-align:right;flex-shrink:0;padding-top:2px;">'
-        + '<div style="font-size:12px;font-weight:700;color:' + st.color + ';font-family:var(--mono);">' + st.label + '</div>'
-        + (due ? '<div style="font-size:10px;color:var(--ink4);font-family:var(--mono);margin-top:2px;">📅 Due ' + fDate(due.toISOString().slice(0,10)) + '</div>' : '')
-      + '</div>'
-    + '</div>'
-
-    // Progress bar
-    + progressHtml
-
-    // Stats row
-    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--brd);">'
-      + '<div style="padding:10px 12px;border-right:1px solid var(--brd);">'
-        + '<div style="font-size:9px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Last Done</div>'
-        + '<div style="font-size:12px;font-weight:700;margin-top:3px;font-family:var(--mono);">' + (item.lastDate ? fDate(item.lastDate) : 'Never') + '</div>'
-      + '</div>'
-      + '<div style="padding:10px 12px;border-right:1px solid var(--brd);">'
-        + '<div style="font-size:9px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Last Cost</div>'
-        + '<div style="font-size:12px;font-weight:700;margin-top:3px;font-family:var(--mono);">' + (lastCost ? cur+fmt(lastCost) : '–') + '</div>'
-      + '</div>'
-      + '<div style="padding:10px 12px;">'
-        + '<div style="font-size:9px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono);">Total Spent</div>'
-        + '<div style="font-size:12px;font-weight:700;margin-top:3px;font-family:var(--mono);">' + (total ? cur+fmt(total) : '–') + '</div>'
-      + '</div>'
-    + '</div>'
-
-    // Action buttons
-    + '<div style="display:flex;gap:8px;padding:10px 15px;border-top:1px solid var(--brd);background:var(--bg2);flex-wrap:wrap;">'
-      + '<button class="btn bp bsm" style="flex:1;justify-content:center;min-width:100px;" onclick="openMaintLog(\'' + item.id + '\')">✓ Mark as Done</button>'
-      + '<button class="btn bg bsm" onclick="openAddMaint(\'' + item.id + '\')">✏️ Edit</button>'
-      + histBtn
-      + '<button class="btn bd bsm" onclick="deleteMaintItem(\'' + item.id + '\')">🗑️ Delete</button>'
-    + '</div>'
+function _maintRow(item, cur) {
+  const st    = maintStatus(item);
+  const total = totalMaintCost(item);
+  return '<div class="cr" onclick="openMaintDetail(\''+item.id+'\')">'
+    + '<div style="width:36px;height:36px;border-radius:10px;background:var(--bg3);display:grid;place-items:center;font-size:17px;flex-shrink:0;">' + (item.icon||'🔧') + '</div>'
+    + '<div class="cm"><div class="ct">' + esc(item.name) + '</div>'
+      + '<div class="cs" style="color:' + st.color + ';">' + st.label + '</div></div>'
+    + '<div class="crt"><div class="ca">' + (total ? cur+fmt(total) : '–') + '</div></div>'
   + '</div>';
 }
+
+// Tap a maintenance row → this action-sheet-style detail, matching the
+// expense-detail pattern (icon/summary up top, plain action list below).
+function openMaintDetail(id) {
+  MAINT_DET_ID = id;
+  const item = (DB.maintenance||[]).find(x=>x.id===id); if (!item) return;
+  const cur  = DB.currency;
+  const st   = maintStatus(item);
+  const due  = maintDueDate(item);
+  const hist = item.history||[];
+  const lastCost = hist.length ? hist[hist.length-1].cost : (item.lastCost||0);
+  const total = totalMaintCost(item);
+
+  document.getElementById('m-maint-det-body').innerHTML =
+    '<div style="text-align:center;padding:14px 0 18px;">'
+    + '<div style="width:56px;height:56px;border-radius:16px;background:var(--bg3);display:grid;place-items:center;font-size:28px;margin:0 auto 10px;">' + (item.icon||'🔧') + '</div>'
+    + '<div style="font-size:18px;font-weight:800;letter-spacing:-.03em;">' + esc(item.name) + '</div>'
+    + '<div style="color:' + st.color + ';font-size:13px;font-weight:700;margin-top:3px;">' + st.label + '</div>'
+    + '</div>'
+    + '<div>'
+    + (item.asset ? '<div class="dr"><div class="dlb">Asset</div><div class="dv">' + esc(item.asset) + '</div></div>' : '')
+    + '<div class="dr"><div class="dlb">Every</div><div class="dv">' + item.interval + ' ' + item.unit + '</div></div>'
+    + '<div class="dr"><div class="dlb">Last Done</div><div class="dv">' + (item.lastDate ? fDate(item.lastDate) : 'Never') + '</div></div>'
+    + '<div class="dr"><div class="dlb">Last Cost</div><div class="dv">' + (lastCost ? cur+fmt(lastCost) : '–') + '</div></div>'
+    + '<div class="dr"><div class="dlb">Next Due</div><div class="dv">' + (due ? fDate(due.toISOString().slice(0,10)) : '–') + '</div></div>'
+    + '<div class="dr"><div class="dlb">Total Spent</div><div class="dv">' + (total ? cur+fmt(total) : '–') + '</div></div>'
+    + '</div>';
+
+  document.getElementById('maint-det-history').style.display = hist.length ? '' : 'none';
+  document.getElementById('maint-det-history').textContent   = 'History (' + hist.length + ')';
+  openMod('m-maint-det');
+}
+function maintDetLog()     { closeMod('m-maint-det'); openMaintLog(MAINT_DET_ID); }
+function maintDetEdit()    { closeMod('m-maint-det'); openAddMaint(MAINT_DET_ID); }
+function maintDetHistory() { closeMod('m-maint-det'); openMaintHistory(MAINT_DET_ID); }
+function maintDetDelete()  { closeMod('m-maint-det'); deleteMaintItem(MAINT_DET_ID); }
 
 function openAddMaint(editId) {
   MAINT_EID = editId||null; MAINT_ICON_IDX = 0;
@@ -2335,7 +2613,7 @@ function saveMaintItem() {
     history = [{ id:uid(), date:lastDate, cost:lastCost, km, notes:notes||('Initial: '+name), loggedAt:new Date().toISOString() }];
     DB.personal.unshift({
       id:uid(), desc:name+(asset?' — '+asset:''), amount:lastCost,
-      date:lastDate, cat:CAT_MAINT, lendTo:'',
+      date:lastDate, cat:CAT_MAINT, lendTo:'', oweTo:'',
       notes:notes||('Maintenance: '+name), maintItemId:itemId,
       createdAt:new Date().toISOString()
     });
@@ -2346,7 +2624,7 @@ function saveMaintItem() {
     if (!DB.personal.some(e => e.maintItemId === itemId)) {
       DB.personal.unshift({
         id:uid(), desc:name+(asset?' — '+asset:''), amount:lastCost,
-        date:lastDate, cat:CAT_MAINT, lendTo:'',
+        date:lastDate, cat:CAT_MAINT, lendTo:'', oweTo:'',
         notes:notes||('Maintenance: '+name), maintItemId:itemId,
         createdAt:new Date().toISOString()
       });
@@ -2442,7 +2720,7 @@ function saveMaintLog() {
       desc: item.name + (item.asset ? ' — ' + item.asset : ''),
       amount: cost, date,
       cat: CAT_MAINT,   // 🔧 Maintenance category, not Health
-      lendTo: '',
+      lendTo: '', oweTo: '',
       notes: notes || ('Maintenance: ' + item.name),
       maintItemId: item.id,  // link back so deletion is safe
       createdAt: new Date().toISOString()
