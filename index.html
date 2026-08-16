@@ -886,7 +886,6 @@ function toast(msg) {
 let UNDO_STACK = null; // { snapshot: DB_JSON, label: string, timer: id, afterFn }
 
 // ── QUICK ADD (Gemini) ───────────────────────
-const GEMINI_MODEL = 'gemini-2.5-flash';
 const QA_ICON_ARROW  = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
 const QA_ICON_SPIN   = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-9-9" opacity=".9"/></svg>';
 
@@ -920,6 +919,50 @@ async function submitQuickAdd() {
   }
 }
 
+// Model names get retired over time ("gemini-2.5-flash is no longer
+// available to new users" etc.), so instead of hardcoding one, ask Gemini
+// what's currently usable and cache the pick per API key. If the cached
+// pick itself later gets retired, one 404 triggers a fresh lookup — so
+// this heals itself instead of needing a code update every time Google
+// deprecates a model.
+async function resolveGeminiModel(forceRefresh) {
+  if (!forceRefresh && DB._gModel && DB._gModelKey === DB.geminiKey) return DB._gModel;
+
+  const res = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(DB.geminiKey)
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error('Could not list Gemini models (' + res.status + '): ' + body.slice(0, 200));
+  }
+  const data   = await res.json();
+  const usable = (data.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent'));
+  if (!usable.length) throw new Error('No usable Gemini models found for this API key');
+
+  const pick =
+    usable.find(m => /flash/i.test(m.name) && !/lite|vision|8b/i.test(m.name)) ||
+    usable.find(m => /flash/i.test(m.name)) ||
+    usable[0];
+  const name = pick.name.replace(/^models\//, '');
+
+  DB._gModel = name; DB._gModelKey = DB.geminiKey; saveDB();
+  return name;
+}
+
+async function callGemini(model, prompt, schema) {
+  return fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + encodeURIComponent(DB.geminiKey),
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json', responseSchema: schema }
+      })
+    }
+  );
+}
+
 async function geminiParseExpense(text) {
   const catLabels = CATS.map(c => c.l);
   const schema = {
@@ -941,17 +984,14 @@ async function geminiParseExpense(text) {
     'If no date is mentioned, use today. Pick exactly one category from the allowed list that best fits. ' +
     'Return only the JSON object.';
 
-  const res = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(DB.geminiKey),
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json', responseSchema: schema }
-      })
-    }
-  );
+  let model = await resolveGeminiModel(false);
+  let res   = await callGemini(model, prompt, schema);
+
+  if (res.status === 404) {
+    // Cached model was retired since we last picked it — rediscover once and retry.
+    model = await resolveGeminiModel(true);
+    res   = await callGemini(model, prompt, schema);
+  }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error('Gemini request failed (' + res.status + '): ' + body.slice(0, 200));
