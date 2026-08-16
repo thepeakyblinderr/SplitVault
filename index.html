@@ -919,14 +919,24 @@ async function submitQuickAdd() {
   }
 }
 
-// Model names get retired over time ("gemini-2.5-flash is no longer
-// available to new users" etc.), so instead of hardcoding one, ask Gemini
-// what's currently usable and cache the pick per API key. If the cached
-// pick itself later gets retired, one 404 triggers a fresh lookup — so
-// this heals itself instead of needing a code update every time Google
-// deprecates a model.
-async function resolveGeminiModel(forceRefresh) {
-  if (!forceRefresh && DB._gModel && DB._gModelKey === DB.geminiKey) return DB._gModel;
+// Model names get retired over time — and Google's ListModels catalog keeps
+// listing a retired model as generateContent-capable even after it starts
+// 404ing on actual calls ("no longer available to new users"). So picking
+// a model isn't enough; a pick that 404s has to be blacklisted and the next
+// candidate tried, not re-picked deterministically forever. The blacklist
+// and the working pick are both cached per API key so this only costs a
+// network round-trip the first time, and again whenever a pick goes bad.
+function _gCacheValid() {
+  if (DB._gModelKey !== DB.geminiKey) { DB._gModel = null; DB._gBadModels = []; DB._gModelKey = DB.geminiKey; }
+  return DB._gModel;
+}
+
+async function resolveGeminiModel(excludeCurrent) {
+  if (excludeCurrent && DB._gModel) {
+    DB._gBadModels = Array.from(new Set([...(DB._gBadModels || []), DB._gModel]));
+    DB._gModel = null;
+  }
+  if (_gCacheValid()) return DB._gModel;
 
   const res = await fetch(
     'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(DB.geminiKey)
@@ -935,18 +945,21 @@ async function resolveGeminiModel(forceRefresh) {
     const body = await res.text().catch(() => '');
     throw new Error('Could not list Gemini models (' + res.status + '): ' + body.slice(0, 200));
   }
-  const data   = await res.json();
-  const usable = (data.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent'));
-  if (!usable.length) throw new Error('No usable Gemini models found for this API key');
+  const data = await res.json();
+  const bad  = new Set(DB._gBadModels || []);
+  const usable = (data.models || [])
+    .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map(m => m.name.replace(/^models\//, ''))
+    .filter(name => !bad.has(name));
+  if (!usable.length) throw new Error('No usable Gemini models left to try for this API key');
 
   const pick =
-    usable.find(m => /flash/i.test(m.name) && !/lite|vision|8b/i.test(m.name)) ||
-    usable.find(m => /flash/i.test(m.name)) ||
+    usable.find(n => /flash/i.test(n) && !/lite|vision|8b/i.test(n)) ||
+    usable.find(n => /flash/i.test(n)) ||
     usable[0];
-  const name = pick.name.replace(/^models\//, '');
 
-  DB._gModel = name; DB._gModelKey = DB.geminiKey; saveDB();
-  return name;
+  DB._gModel = pick; DB._gModelKey = DB.geminiKey; saveDB();
+  return pick;
 }
 
 async function callGemini(model, prompt, schema) {
@@ -987,8 +1000,10 @@ async function geminiParseExpense(text) {
   let model = await resolveGeminiModel(false);
   let res   = await callGemini(model, prompt, schema);
 
-  if (res.status === 404) {
-    // Cached model was retired since we last picked it — rediscover once and retry.
+  // A 404 means this specific model is dead for this key even though it was
+  // listed as usable — blacklist it and try the next candidate, a few times
+  // if needed, rather than re-picking the same dead model forever.
+  for (let tries = 0; res.status === 404 && tries < 3; tries++) {
     model = await resolveGeminiModel(true);
     res   = await callGemini(model, prompt, schema);
   }
